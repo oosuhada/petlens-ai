@@ -199,7 +199,7 @@ export default function PhotoStage({ featured, tr }) {
             position="absolute"
             right={[3, 5]}
             top={[3, 5]}
-            zIndex="7"
+            zIndex="50"
             borderRadius="full"
             px="3"
             py="2"
@@ -209,6 +209,8 @@ export default function PhotoStage({ featured, tr }) {
             fontWeight="800"
             letterSpacing="0.12em"
             boxShadow="0 8px 24px rgba(10,11,16,.10)"
+            pointerEvents="none"
+            style={{ transform: "translateZ(96px)" }}
           >
             37 BREEDS · CAT &amp; DOG
           </Badge>

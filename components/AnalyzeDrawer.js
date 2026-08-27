@@ -21,6 +21,8 @@ export default function AnalyzeDrawer({
   isOpen,
   onClose,
   onFile,
+  onSelectPet,
+  selectedPetId,
   isAnalyzing,
   previewUrl,
   analysis,
@@ -30,9 +32,11 @@ export default function AnalyzeDrawer({
   const inputRef = useRef(null);
   const { colorMode } = useColorMode();
   const dark = colorMode === "dark";
-  const topPrediction = analysis?.predictions?.[0];
   const detectedPets = analysis?.pets || [];
   const detectedPetCount = analysis?.detected_pet_count || 0;
+  const selectedPet = detectedPets.find((pet) => pet.id === selectedPetId) || detectedPets[0] || null;
+  const selectedPredictions = selectedPet?.predictions || analysis?.predictions || [];
+  const topPrediction = selectedPredictions[0];
 
   return (
     <Drawer isOpen={isOpen} placement="right" size="md" onClose={onClose} finalFocusRef={inputRef}>
@@ -105,6 +109,8 @@ export default function AnalyzeDrawer({
                 />
                 {detectedPets.filter((pet) => !pet.fallback).map((pet, index) => (
                   <Box
+                    as="button"
+                    type="button"
                     key={pet.id}
                     position="absolute"
                     left={`${pet.box.normalized.x * 100}%`}
@@ -112,10 +118,13 @@ export default function AnalyzeDrawer({
                     width={`${pet.box.normalized.width * 100}%`}
                     height={`${pet.box.normalized.height * 100}%`}
                     border="2px solid"
-                    borderColor="pink.400"
+                    borderColor={selectedPet?.id === pet.id ? "pink.400" : "whiteAlpha.700"}
                     borderRadius="10px"
-                    pointerEvents="none"
-                    boxShadow="0 0 0 1px rgba(255,255,255,0.55)"
+                    cursor="pointer"
+                    onClick={() => onSelectPet?.(pet.id)}
+                    boxShadow={selectedPet?.id === pet.id ? "0 0 0 2px rgba(236,72,153,0.28)" : "0 0 0 1px rgba(255,255,255,0.55)"}
+                    _focus={{ outline: "none", boxShadow: "0 0 0 3px rgba(236,72,153,0.42)" }}
+                    aria-label={tr(`반려동물 ${index + 1} 선택`, `Select pet ${index + 1}`)}
                   >
                     <Text
                       position="absolute"
@@ -175,13 +184,22 @@ export default function AnalyzeDrawer({
                           const petTop = pet.predictions?.[0];
                           return (
                             <Box
+                              as="button"
+                              type="button"
                               key={pet.id}
                               border="1px solid"
-                              borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"}
+                              borderColor={selectedPet?.id === pet.id ? "pink.400" : (dark ? "whiteAlpha.200" : "blackAlpha.100")}
                               borderRadius="12px"
                               px="4"
                               py="3.5"
+                              width="100%"
+                              textAlign="left"
                               bg={dark ? "#19151d" : "white"}
+                              cursor="pointer"
+                              onClick={() => onSelectPet?.(pet.id)}
+                              boxShadow={selectedPet?.id === pet.id ? "0 0 0 1px rgba(236,72,153,0.22)" : "none"}
+                              _hover={{ borderColor: "pink.300" }}
+                              _focus={{ outline: "none", boxShadow: "0 0 0 3px rgba(236,72,153,0.28)" }}
                             >
                               <Flex align="center" justify="space-between">
                                 <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.1em">
@@ -215,7 +233,7 @@ export default function AnalyzeDrawer({
                     <Box minW="0">
                       <Text color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="10px" fontWeight="800" letterSpacing="0.12em">
                         {detectedPets.length > 1
-                          ? tr("대표 개체의 가장 높은 예측", "PRIMARY PET · TOP PREDICTION")
+                          ? tr("선택한 개체의 가장 높은 예측", "SELECTED PET · TOP PREDICTION")
                           : tr("가장 높은 예측", "TOP PREDICTION")}
                       </Text>
                       <Text fontSize="2xl" fontWeight="800" mt="1" textTransform="capitalize" noOfLines={1}>{topPrediction?.label}</Text>
@@ -224,7 +242,7 @@ export default function AnalyzeDrawer({
                   </Flex>
 
                   <Stack spacing="3.5">
-                    {analysis.predictions.map((prediction, index) => (
+                    {selectedPredictions.map((prediction, index) => (
                       <Box key={`${prediction.label}-${index}`}>
                         <Flex align="baseline" mb="1.5">
                           <Text flex="1" minW="0" fontSize="sm" fontWeight={index === 0 ? "700" : "500"} textTransform="capitalize" noOfLines={1}>{prediction.label}</Text>
@@ -239,7 +257,7 @@ export default function AnalyzeDrawer({
                     <Text fontSize="sm" fontWeight="700">{tr("갤러리가 유사도 순으로 바뀌었습니다", "The gallery is now ranked by similarity")}</Text>
                     <Text color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="xs" lineHeight="1.6" mt="1">
                       {detectedPets.length > 1
-                        ? tr("현재는 감지 점수가 가장 높은 대표 개체를 기준으로 갤러리를 정렬합니다.", "The gallery is currently ranked from the highest-confidence detected pet.")
+                        ? tr("사진의 감지 박스나 개체 카드를 선택하면 해당 반려동물의 CLIP 유사도 순위로 갤러리가 즉시 바뀝니다.", "Select a detection box or pet card to switch the gallery to that pet's CLIP similarity ranking.")
                         : tr("Drawer를 닫으면 CLIP 이미지 유사도 순위를 바로 확인할 수 있습니다.", "Close this drawer to inspect the CLIP image-similarity ranking.")}
                     </Text>
                   </Box>

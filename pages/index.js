@@ -45,6 +45,7 @@ export default function Home({ data }) {
   const [searchError, setSearchError] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [analysis, setAnalysis] = useState(null);
+  const [selectedPetId, setSelectedPetId] = useState("");
   const [analysisError, setAnalysisError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -64,6 +65,7 @@ export default function Home({ data }) {
     setMode("all");
     setSpeciesFilter("all");
     setSearchError("");
+    setSelectedPetId("");
   };
 
   const handleSearch = async (event) => {
@@ -112,14 +114,17 @@ export default function Home({ data }) {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(file));
     setAnalysis(null);
+    setSelectedPetId("");
     setAnalysisError("");
     setIsAnalyzing(true);
     drawer.onOpen();
 
     try {
       const result = await analyzePet(file, 16);
+      const primaryPet = result.pets?.find((pet) => pet.id === result.primary_pet_id) || result.pets?.[0];
       setAnalysis(result);
-      setPhotos(result.matches);
+      setSelectedPetId(primaryPet?.id || "");
+      setPhotos(primaryPet?.matches || result.matches);
       setMode("similar");
       setActiveQuery("");
       setQuery("");
@@ -129,6 +134,22 @@ export default function Home({ data }) {
       setIsAnalyzing(false);
       event.target.value = "";
     }
+  };
+
+  const selectedPet = useMemo(() => {
+    if (!analysis?.pets?.length) return null;
+    return analysis.pets.find((pet) => pet.id === selectedPetId) || analysis.pets[0];
+  }, [analysis, selectedPetId]);
+
+  const handleSelectPet = (petId) => {
+    const pet = analysis?.pets?.find((item) => item.id === petId);
+    if (!pet) return;
+    setSelectedPetId(pet.id);
+    setPhotos(pet.matches || []);
+    setMode("similar");
+    setSpeciesFilter("all");
+    setActiveQuery("");
+    setQuery("");
   };
 
   const galleryMeta = {
@@ -145,8 +166,11 @@ export default function Home({ data }) {
     similar: {
       eyebrow: "CLIP · IMAGE → IMAGE",
       title: tr("업로드 사진과 닮은 순서", "Similar to your upload"),
-      subtitle: analysis?.predictions?.[0]
-        ? tr(`ViT 1순위 · ${analysis.predictions[0].label}`, `ViT top-1 · ${analysis.predictions[0].label}`)
+      subtitle: selectedPet?.predictions?.[0]
+        ? tr(
+            `${selectedPetId ? `${selectedPet.id.toUpperCase()} · ` : ""}ViT 1순위 · ${selectedPet.predictions[0].label}`,
+            `${selectedPetId ? `${selectedPet.id.toUpperCase()} · ` : ""}ViT top-1 · ${selectedPet.predictions[0].label}`
+          )
         : tr("이미지 임베딩 유사도 순위", "Ranked by image-embedding similarity"),
     },
   }[mode];
@@ -466,6 +490,8 @@ export default function Home({ data }) {
         isOpen={drawer.isOpen}
         onClose={drawer.onClose}
         onFile={handleFile}
+        onSelectPet={handleSelectPet}
+        selectedPetId={selectedPetId}
         isAnalyzing={isAnalyzing}
         previewUrl={previewUrl}
         analysis={analysis}

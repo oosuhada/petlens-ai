@@ -119,7 +119,12 @@ export default function PhotoDetail({ pic }) {
             </Text>
           </Box>
 
-          <Flex mt={[9, 10]} gap="4" direction={["column", "row", "column", "row"]}>
+          <Flex
+            mt={[9, 10]}
+            direction="row"
+            columnGap={[5, 6, 7]}
+            align="stretch"
+          >
             <Link href="/" passHref>
               <Button as="a" flex="1" minH="52px" borderRadius="12px" bg="pink.500" color="white" _hover={{ bg: "pink.600" }}>
                 {tr("갤러리로", "Gallery")}

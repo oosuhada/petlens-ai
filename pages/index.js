@@ -179,7 +179,7 @@ export default function Home({ data }) {
           <Flex
             direction="column"
             align="stretch"
-            gap={[4, 5, 6]}
+            gap={[7, 9, 12]}
           >
             <Box
               flex="1"

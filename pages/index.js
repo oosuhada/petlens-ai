@@ -284,10 +284,11 @@ export default function Home({ data }) {
               </Text>
               <Flex
                 mt="5"
-                align={["flex-start", "center"]}
-                direction={["column", "row"]}
-                wrap={["nowrap", "wrap"]}
-                gap={["3", "5"]}
+                align="center"
+                direction="row"
+                wrap="wrap"
+                columnGap={["4", "8", "12"]}
+                rowGap="3"
               >
                 <Button
                   h="50px"
@@ -304,6 +305,7 @@ export default function Home({ data }) {
                   color={dark ? "whiteAlpha.400" : "gray.400"}
                   fontSize="xs"
                   lineHeight="1.5"
+                  ml={[0, 1, 2]}
                 >
                   JPG, PNG, WebP · {tr("최대 12MB", "up to 12 MB")}
                 </Text>

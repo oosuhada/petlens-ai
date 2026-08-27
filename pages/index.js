@@ -400,7 +400,7 @@ export default function Home({ data }) {
               boxShadow={dark ? "0 18px 38px rgba(0,0,0,0.20)" : "0 18px 42px rgba(59,37,70,0.07)"}
             >
               <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.16em">
-                PETLENS 2.0 · {tr("감지 + 품종 분석", "DETECT + BREED ANALYSIS")}
+                PETLENS 2.0 · {tr("감지 + 품종 + 행동 분석", "DETECT + BREED + ACTION")}
               </Text>
               <Heading
                 as="h2"
@@ -409,7 +409,7 @@ export default function Home({ data }) {
                 lineHeight="1.16"
                 letterSpacing="-0.04em"
               >
-                {tr("반려동물 사진 분석", "Analyze a pet photo")}
+                {tr("반려동물 사진·영상 분석", "Analyze pet photos and videos")}
               </Heading>
               <Text
                 color={dark ? "whiteAlpha.700" : "gray.600"}
@@ -420,8 +420,8 @@ export default function Home({ data }) {
                 wordBreak="keep-all"
               >
                 {tr(
-                  "한 장의 사진에서 고양이와 강아지를 먼저 찾아 개체별로 분석합니다. 강아지는 130개 품종 Dog-130 모델을, 고양이는 기존 Pet-37 모델을 사용하고 CLIP 유사도 검색을 함께 실행합니다.",
-                  "PetLens first detects cats and dogs, then analyzes each pet independently. Dogs use the 130-breed Dog-130 classifier, cats use Pet-37, and CLIP provides similarity retrieval."
+                  "사진에서는 개체별 품종과 유사 이미지를 분석하고, 영상에서는 SAM2로 각 반려동물을 추적해 품종 결과와 zero-shot 행동 타임라인을 함께 만듭니다. 강아지는 Dog-130, 고양이는 Pet-37을 사용합니다.",
+                  "Photos provide per-pet breed and similarity analysis. Videos add SAM2 tracking plus a zero-shot action timeline for each pet. Dogs use Dog-130 and cats use Pet-37."
                 )}
               </Text>
               <Flex

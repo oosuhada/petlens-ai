@@ -23,6 +23,29 @@ const motionLabel = (status, tr) => ({
   not_tracked: tr("추적 실패", "Not tracked"),
 }[status] || status || "-");
 
+const actionLabel = (status, tr) => ({
+  unknown: tr("판단 유보", "Unknown"),
+  standing: tr("서 있기", "Standing"),
+  sitting: tr("앉아 있기", "Sitting"),
+  lying_down: tr("누워 있기", "Lying down"),
+  sleeping: tr("잠자기", "Sleeping"),
+  walking: tr("걷기", "Walking"),
+  running: tr("달리기", "Running"),
+  jumping: tr("점프", "Jumping"),
+  eating: tr("먹기", "Eating"),
+  drinking: tr("물 마시기", "Drinking"),
+  playing: tr("놀기", "Playing"),
+  grooming: tr("그루밍", "Grooming"),
+}[status] || status || "-");
+
+const formatSeconds = (seconds) => {
+  if (typeof seconds !== "number" || Number.isNaN(seconds)) return "--:--";
+  const rounded = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(rounded / 60);
+  const remain = rounded % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remain).padStart(2, "0")}`;
+};
+
 export default function VideoAnalyzeDrawer({
   isOpen,
   onClose,
@@ -120,6 +143,42 @@ export default function VideoAnalyzeDrawer({
                           <Text mt="2" fontSize="xs" color={dark ? "whiteAlpha.600" : "gray.600"}>
                             {tr("움직임", "Motion")} · {motionLabel(track.motion?.status, tr)}
                           </Text>
+                          {(track.actions?.segments || []).length > 0 && (
+                            <Box mt="4" pt="4" borderTop="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
+                              <Flex align="baseline">
+                                <Text flex="1" minW="0" fontSize="10px" fontWeight="800" letterSpacing="0.1em" color="purple.400">
+                                  ACTION · ZERO-SHOT
+                                </Text>
+                                <Text ml="4" fontSize="xs" fontWeight="800">
+                                  {actionLabel(track.actions.dominant_action || "unknown", tr)}
+                                </Text>
+                              </Flex>
+                              <Stack spacing="2" mt="3">
+                                {(track.actions.segments || []).map((segment, segmentIndex) => (
+                                  <Flex key={`${track.id}-action-${segmentIndex}`} align="baseline">
+                                    <Text flexShrink="0" fontSize="10px" color={dark ? "whiteAlpha.400" : "gray.400"}>
+                                      {formatSeconds(segment.start_seconds)}–{formatSeconds(segment.end_seconds)}
+                                    </Text>
+                                    <Text ml="3" flex="1" minW="0" fontSize="xs" fontWeight="700" noOfLines={1}>
+                                      {actionLabel(segment.label, tr)}
+                                      {segment.label === "unknown" && segment.candidate_label
+                                        ? ` · ${tr("후보", "candidate")} ${actionLabel(segment.candidate_label, tr)}`
+                                        : ""}
+                                    </Text>
+                                    <Text ml="3" flexShrink="0" fontSize="10px" color={dark ? "whiteAlpha.500" : "gray.500"}>
+                                      {(segment.score * 100).toFixed(0)}
+                                    </Text>
+                                  </Flex>
+                                ))}
+                              </Stack>
+                              <Text mt="3" fontSize="10px" lineHeight="1.55" color={dark ? "whiteAlpha.400" : "gray.400"}>
+                                {tr(
+                                  "CLIP 장면 의미와 SAM2 이동량을 합친 zero-shot 행동 점수입니다. 확정적인 행동 확률은 아닙니다.",
+                                  "Zero-shot action scores combine CLIP frame semantics with SAM2 motion and are not calibrated action probabilities."
+                                )}
+                              </Text>
+                            </Box>
+                          )}
                           {(track.matches || []).length > 0 && (
                             <Text mt="2" fontSize="xs" color={dark ? "whiteAlpha.500" : "gray.500"} noOfLines={2}>
                               {tr("유사 이미지", "Similar")} · {(track.matches || []).slice(0, 3).map((photo) => photo.breed).join(" · ")}

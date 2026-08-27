@@ -14,6 +14,7 @@ PetLens는 「생성형 AI 기반 멀티모달 AI 서비스 개발 과정」에�
 - **CLIP**: 자연어 → 이미지 검색, 이미지 → 유사 이미지 검색
 - **Grounding DINO**: 복잡한 사진에서 cat / dog 위치 감지, 여러 마리 개별 crop 분석
 - **SAM2**: 감지된 반려동물 segmentation 및 짧은 영상 object tracking
+- **Action timeline**: CLIP zero-shot 장면 의미 + SAM2 track motion을 결합한 시간대별 행동 후보
 - **SigLIP2 / DINOv2**: zero-shot 품종 비교와 visual retrieval 비교
 - **ViTPose++ (AP-10K expert)**: 고양이·강아지 17-keypoint animal pose estimation
 - **Web**: Next.js + Chakra UI
@@ -68,9 +69,9 @@ PetLens 2.0은 업로드 이미지를 바로 전체-frame classifier에 넣지 �
 - `POST /open-set/siglip2`: ViT 결과와 SigLIP2 zero-shot 품종 순위를 비교합니다. 불일치는 오답 확정이 아니라 open-set / ambiguity 신호로 사용합니다.
 - `POST /compare/retrieval`: 같은 pet crop을 CLIP과 DINOv2 feature space에서 각각 검색해 순위를 비교합니다.
 - `POST /pose`: Grounding DINO box를 ViTPose++ AP-10K expert에 전달해 동물 keypoint를 반환합니다.
-- `POST /analyze/video`: 짧은 영상을 샘플링하고 첫 프레임 detection → SAM2 tracking → track별 ViT / CLIP 집계를 수행합니다.
+- `POST /analyze/video`: 짧은 영상을 샘플링하고 첫 프레임 detection → SAM2 tracking → track별 ViT / CLIP 집계 → CLIP zero-shot + temporal motion 기반 action timeline을 수행합니다.
 
-영상 기능은 Mac mini에서의 실시간 스트리밍이 아니라 짧은 업로드 영상을 대상으로 한 batch 분석입니다. CPU/MPS serving 비용을 제한하기 위해 기본적으로 최대 12개 프레임을 샘플링합니다.
+영상 기능은 Mac mini에서의 실시간 스트리밍이 아니라 짧은 업로드 영상을 대상으로 한 batch 분석입니다. CPU/MPS serving 비용을 제한하기 위해 기본적으로 최대 12개 프레임을 샘플링합니다. 행동 라벨은 `standing`, `sitting`, `lying_down`, `sleeping`, `walking`, `running`, `jumping`, `eating`, `drinking`, `playing`, `grooming`이며, score는 전용 action classifier의 calibrated probability가 아니라 CLIP 의미 점수와 track motion prior를 합친 zero-shot 상대 점수입니다.
 
 ### 5. 품종 상세 화면
 

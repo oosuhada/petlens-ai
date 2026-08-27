@@ -48,6 +48,22 @@ DEFAULT_SIGLIP2_MODEL = "google/siglip2-base-patch16-224"
 DEFAULT_VIDEO_MODEL = "facebook/sam2-hiera-tiny"
 DEFAULT_POSE_MODEL = "usyd-community/vitpose-plus-base"
 
+ACTION_PROMPTS = {
+    "standing": "a {species} standing",
+    "sitting": "a {species} sitting",
+    "lying_down": "a {species} lying down",
+    "sleeping": "a {species} sleeping",
+    "walking": "a {species} walking",
+    "running": "a {species} running",
+    "jumping": "a {species} jumping",
+    "eating": "a {species} eating food",
+    "drinking": "a {species} drinking water",
+    "playing": "a {species} playing",
+    "grooming": "a {species} grooming itself",
+}
+ACTION_MIN_SCORE = float(os.getenv("PETLENS_ACTION_MIN_SCORE", "0.18"))
+ACTION_MIN_MARGIN = float(os.getenv("PETLENS_ACTION_MIN_MARGIN", "0.012"))
+
 VIT_MODEL = os.getenv("PETLENS_VIT_MODEL", DEFAULT_VIT_MODEL)
 DOG130_MODEL = os.getenv("PETLENS_DOG130_MODEL", "").strip() or None
 CLIP_MODEL_NAME = os.getenv("PETLENS_CLIP_MODEL", DEFAULT_CLIP_MODEL)
@@ -138,6 +154,7 @@ class Runtime:
         self.pose_processor = None
         self.pose_model = None
         self.pose_error: str | None = None
+        self.action_text_embeddings: dict[str, np.ndarray] = {}
         self.gallery_embeddings: np.ndarray | None = None
 
     def load_vit(self) -> None:
@@ -341,6 +358,174 @@ class Runtime:
             )
             features = self._normalize(features)
         return features.detach().cpu().numpy().astype(np.float32)
+
+    def action_text_embedding(self, species: str) -> np.ndarray:
+        normalized_species = species if species in {"dog", "cat"} else "pet"
+        if normalized_species in self.action_text_embeddings:
+            return self.action_text_embeddings[normalized_species]
+        prompts = [
+            prompt.format(species=normalized_species)
+            for prompt in ACTION_PROMPTS.values()
+        ]
+        embeddings = self.text_embedding(prompts)
+        self.action_text_embeddings[normalized_species] = embeddings
+        return embeddings
+
+    def infer_action(
+        self,
+        image: Image.Image,
+        species: str,
+        normalized_motion: float,
+        vertical_motion: float = 0.0,
+    ) -> dict[str, Any]:
+        labels = list(ACTION_PROMPTS.keys())
+        image_embedding = self.image_embedding([image])
+        text_embeddings = self.action_text_embedding(species)
+        similarities = (image_embedding @ text_embeddings.T)[0]
+        logits = torch.tensor(similarities * 18.0, dtype=torch.float32)
+
+        index = {label: idx for idx, label in enumerate(labels)}
+        if normalized_motion < 0.02:
+            for label in ("standing", "sitting", "lying_down", "sleeping", "eating", "drinking", "grooming"):
+                logits[index[label]] += 0.35
+            logits[index["walking"]] -= 0.8
+            logits[index["running"]] -= 1.1
+            logits[index["jumping"]] -= 1.0
+        elif normalized_motion < 0.08:
+            logits[index["walking"]] += 0.9
+            logits[index["running"]] += 0.35
+            logits[index["playing"]] += 0.25
+            logits[index["sleeping"]] -= 0.8
+            logits[index["lying_down"]] -= 0.4
+        else:
+            logits[index["running"]] += 1.2
+            logits[index["playing"]] += 0.55
+            logits[index["walking"]] += 0.35
+            logits[index["sleeping"]] -= 1.2
+            logits[index["lying_down"]] -= 0.8
+
+        if vertical_motion > 0.035:
+            logits[index["jumping"]] += 1.2
+            logits[index["running"]] += 0.25
+
+        probabilities = F.softmax(logits, dim=-1)
+        values, indices = torch.topk(probabilities, k=min(3, len(labels)))
+        candidates = [
+            {
+                "label": labels[int(label_index)],
+                "score": float(score),
+            }
+            for score, label_index in zip(values.tolist(), indices.tolist())
+        ]
+        top = candidates[0]
+        second_score = candidates[1]["score"] if len(candidates) > 1 else 0.0
+        margin = max(0.0, float(top["score"]) - float(second_score))
+        uncertain = float(top["score"]) < ACTION_MIN_SCORE or margin < ACTION_MIN_MARGIN
+        return {
+            "label": "unknown" if uncertain else top["label"],
+            "score": top["score"],
+            "candidate_label": top["label"],
+            "candidate_score": top["score"],
+            "margin": margin,
+            "is_uncertain": uncertain,
+            "candidates": candidates,
+            "motion": {
+                "normalized_displacement": float(normalized_motion),
+                "vertical_displacement": float(vertical_motion),
+            },
+            "method": "clip_zero_shot_plus_tracking_motion",
+            "thresholds": {
+                "min_score": ACTION_MIN_SCORE,
+                "min_margin": ACTION_MIN_MARGIN,
+            },
+            "note": "Zero-shot action score; uncertain segments are returned as unknown rather than forced into a label.",
+        }
+
+    def action_timeline(
+        self,
+        frames: list[Image.Image],
+        timeline: list[dict[str, Any]],
+        sampled_indices: list[int],
+        fps: float,
+        species: str,
+        max_segments: int = 3,
+    ) -> dict[str, Any]:
+        if not timeline:
+            return {
+                "status": "not_tracked",
+                "method": "clip_zero_shot_plus_tracking_motion",
+                "segments": [],
+                "dominant_action": None,
+            }
+
+        segment_count = min(max_segments, len(timeline))
+        chunks = [chunk.tolist() for chunk in np.array_split(np.arange(len(timeline)), segment_count) if len(chunk)]
+        diagonal = max(1.0, float(np.hypot(frames[0].width, frames[0].height)))
+        frame_height = max(1.0, float(frames[0].height))
+        segments: list[dict[str, Any]] = []
+        aggregate: dict[str, float] = {}
+
+        for chunk in chunks:
+            entries = [timeline[position] for position in chunk]
+            centers = [
+                ((entry["box"][0] + entry["box"][2]) / 2.0, (entry["box"][1] + entry["box"][3]) / 2.0)
+                for entry in entries
+            ]
+            motion_distance = sum(
+                float(np.hypot(second[0] - first[0], second[1] - first[1]))
+                for first, second in zip(centers, centers[1:])
+            )
+            vertical_distance = sum(
+                abs(second[1] - first[1])
+                for first, second in zip(centers, centers[1:])
+            )
+            normalized_motion = motion_distance / diagonal
+            normalized_vertical = vertical_distance / frame_height
+
+            representative = entries[len(entries) // 2]
+            sampled_frame_index = int(representative["frame_index"])
+            if sampled_frame_index >= len(frames):
+                continue
+            crop = self._crop_with_padding(
+                frames[sampled_frame_index],
+                representative["box"],
+                padding_ratio=0.08,
+            )
+            inference = self.infer_action(
+                crop,
+                species,
+                normalized_motion=normalized_motion,
+                vertical_motion=normalized_vertical,
+            )
+
+            start_sampled = int(entries[0]["frame_index"])
+            end_sampled = int(entries[-1]["frame_index"])
+            start_original = sampled_indices[start_sampled] if start_sampled < len(sampled_indices) else start_sampled
+            end_original = sampled_indices[end_sampled] if end_sampled < len(sampled_indices) else end_sampled
+            start_time = (start_original / fps) if fps > 0 else None
+            end_time = (end_original / fps) if fps > 0 else None
+            segment = {
+                "start_frame": int(start_original),
+                "end_frame": int(end_original),
+                "start_seconds": start_time,
+                "end_seconds": end_time,
+                **inference,
+            }
+            segments.append(segment)
+            aggregate[inference["label"]] = aggregate.get(inference["label"], 0.0) + float(inference["score"])
+
+        dominant_action = max(aggregate, key=aggregate.get) if aggregate else None
+        return {
+            "status": "zero_shot",
+            "method": "clip_zero_shot_plus_tracking_motion",
+            "labels": list(ACTION_PROMPTS.keys()),
+            "dominant_action": dominant_action,
+            "segments": segments,
+            "note": (
+                "Semantic action timeline combines CLIP zero-shot frame semantics with SAM2 track motion. "
+                "Scores are relative zero-shot signals, not calibrated probabilities."
+            ),
+        }
 
     def dino_embedding(self, images: list[Image.Image]) -> np.ndarray:
         self.load_dino()
@@ -855,7 +1040,7 @@ runtime = Runtime()
 app = FastAPI(
     title="PetLens ML Service",
     description="Pet detection, ViT breed classification, and CLIP semantic retrieval pipeline.",
-    version="2.0.0",
+    version="2.1.0",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -978,6 +1163,12 @@ def health() -> dict[str, Any]:
         "video_model": VIDEO_MODEL,
         "video_ready": runtime.video_model is not None,
         "video_error": runtime.video_error,
+        "action_engine": {
+            "method": "clip_zero_shot_plus_tracking_motion",
+            "labels": list(ACTION_PROMPTS.keys()),
+            "min_score": ACTION_MIN_SCORE,
+            "min_margin": ACTION_MIN_MARGIN,
+        },
         "pose_model": POSE_MODEL,
         "pose_ready": runtime.pose_model is not None,
         "pose_error": runtime.pose_error,
@@ -1173,7 +1364,7 @@ async def analyze_video(
         raise HTTPException(status_code=503, detail=f"Video pet detector unavailable: {exc}") from exc
     if not detections:
         return {
-            "version": "2.0-video",
+            "version": "2.1-video",
             "video": metadata,
             "detected_pet_count": 0,
             "tracks": [],
@@ -1190,7 +1381,18 @@ async def analyze_video(
     for track_index, track in enumerate(tracks):
         timeline = track.get("timeline", [])
         if not timeline:
-            enriched_tracks.append({**track, "predictions": [], "results": [], "motion": {"status": "not_tracked"}})
+            enriched_tracks.append({
+                **track,
+                "predictions": [],
+                "results": [],
+                "motion": {"status": "not_tracked"},
+                "actions": {
+                    "status": "not_tracked",
+                    "method": "clip_zero_shot_plus_tracking_motion",
+                    "segments": [],
+                    "dominant_action": None,
+                },
+            })
             continue
 
         representative_positions = sorted(set([0, len(timeline) // 2, len(timeline) - 1]))
@@ -1232,6 +1434,23 @@ async def analyze_video(
         else:
             motion_label = "high_motion"
 
+        try:
+            actions = runtime.action_timeline(
+                frames,
+                timeline,
+                sampled_indices,
+                float(metadata["fps"]),
+                str(track.get("species") or "pet"),
+            )
+        except Exception as exc:
+            actions = {
+                "status": "unavailable",
+                "method": "clip_zero_shot_plus_tracking_motion",
+                "dominant_action": None,
+                "segments": [],
+                "error": str(exc),
+            }
+
         enriched_timeline = []
         for entry in timeline:
             sampled_position = int(entry["frame_index"])
@@ -1256,13 +1475,14 @@ async def analyze_video(
                 "motion": {
                     "status": motion_label,
                     "normalized_displacement": normalized_motion,
-                    "note": "Motion is a geometric tracking descriptor, not semantic action recognition.",
+                    "note": "Motion is a geometric tracking descriptor used as one signal for zero-shot action inference.",
                 },
+                "actions": actions,
             }
         )
 
     return {
-        "version": "2.0-video",
+        "version": "2.1-video",
         "video": metadata,
         "detected_pet_count": len(detections),
         "tracking_model": VIDEO_MODEL,
@@ -1273,6 +1493,7 @@ async def analyze_video(
             "classifier_pet37": VIT_MODEL,
             "classifier_dog130": DOG130_MODEL,
             "retrieval": CLIP_MODEL_NAME,
+            "action": "CLIP zero-shot + SAM2 tracking motion",
         },
     }
 

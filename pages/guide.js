@@ -77,6 +77,16 @@ export default function Guide() {
       ),
       tip: tr("상세 화면의 91.41% 정확도와 91.32% Macro F1은 해당 한 장의 예측 확률이 아니라 전체 평가셋에서 측정한 모델 지표입니다.", "The 91.41% accuracy and 91.32% Macro F1 shown here are evaluation-set metrics, not confidence scores for that individual image."),
     },
+    {
+      no: "05",
+      label: "VIDEO · ACTION TIMELINE",
+      title: tr("영상에서는 개체 추적과 행동 타임라인을 함께 보세요", "Read video through tracking and an action timeline"),
+      body: tr(
+        "영상을 업로드하면 첫 샘플 프레임에서 고양이와 강아지를 찾고 SAM2가 각 개체를 최대 12개 샘플 프레임에서 추적합니다. 각 track의 대표 crop은 품종 분류와 CLIP 검색에 사용되고, 동시에 CLIP zero-shot 장면 의미와 track 이동량을 결합해 서 있기·앉기·걷기·달리기·점프·먹기·물 마시기·놀기·그루밍·잠자기·눕기 중 행동 후보를 시간 구간별로 표시합니다.",
+        "Upload a video and PetLens detects cats and dogs on the first sampled frame, then tracks each subject with SAM2 across up to 12 sampled frames. Representative crops drive breed classification and CLIP retrieval, while CLIP zero-shot frame semantics plus track motion produce time-segmented action candidates such as standing, sitting, walking, running, jumping, eating, drinking, playing, grooming, sleeping, and lying down."
+      ),
+      tip: tr("ACTION의 숫자는 학습된 행동 확률이 아니라 zero-shot 상대 점수입니다. 실제 행동을 확정하는 용도가 아니라 영상에서 무엇이 일어나는지 빠르게 탐색하는 신호로 읽으세요.", "ACTION numbers are relative zero-shot scores, not calibrated action probabilities. Use them as navigation signals for what may be happening in the clip, not as definitive labels."),
+    },
   ];
 
   return (

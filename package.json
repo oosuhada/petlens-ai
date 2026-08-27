@@ -1,0 +1,39 @@
+{
+  "name": "petlens-web",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "author": "oosuhada",
+  "license": "MIT",
+  "dependencies": {
+    "@chakra-ui/icons": "^1.0.0",
+    "@chakra-ui/react": "^1.0.0",
+    "@emotion/react": "^11.0.0",
+    "@emotion/styled": "^11.0.0",
+    "framer-motion": "^2.9.4",
+    "next": "10.0.1",
+    "react": "17.0.1",
+    "react-dom": "17.0.1",
+    "sharp": "^0.35.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oosuhada/petlens-ai.git"
+  },
+  "keywords": [
+    "vit",
+    "clip",
+    "multimodal-ai",
+    "image-classification",
+    "semantic-search",
+    "nextjs",
+    "fastapi"
+  ],
+  "bugs": {
+    "url": "https://github.com/oosuhada/petlens-ai/issues"
+  },
+  "homepage": "https://github.com/oosuhada/petlens-ai#readme"
+}

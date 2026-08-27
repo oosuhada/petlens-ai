@@ -40,7 +40,7 @@ export default function Guide() {
     <Box minH="100vh" bg={dark ? "#0f0c12" : "#fbfafc"} color={dark ? "white" : "gray.800"}>
       <Head><title>{tr("결과 읽는 법", "Guide")} · PetLens</title></Head>
 
-      <Flex h="68px" px={[4, 6, 8]} align="center" borderBottom="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
+      <Flex h="68px" px={[3, 6, 8]} align="center" gap="1" borderBottom="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
         <Link href="/" passHref><Button as="a" variant="ghost" size="sm" leftIcon={<ArrowBackIcon />} mr="2">{tr("갤러리", "Gallery")}</Button></Link>
         <BrandMark dark={dark} compact />
         <Box flex="1" />
@@ -48,7 +48,7 @@ export default function Guide() {
         <Button size="sm" variant="ghost" px="2" minW="34px" onClick={toggleColorMode}>{dark ? <SunIcon /> : <MoonIcon />}</Button>
       </Flex>
 
-      <Box maxW="980px" mx="auto" px={[5, 7, 9]} py={[9, 12, 14]}>
+      <Box maxW="980px" mx="auto" px={[5, 7, 9]} pt={[9, 12, 14]} pb={[12, 14, 16]}>
         <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.16em">MODEL GUIDE</Text>
         <Text fontSize={["3xl", "4xl"]} fontWeight="800" letterSpacing="-0.045em" mt="3">
           {tr("결과를 과하게 읽지 않는 법", "How to read the results")}
@@ -69,7 +69,7 @@ export default function Guide() {
           ))}
         </Grid>
 
-        <Box mt="8" px="5" py="4" borderLeft="2px solid" borderColor="pink.400" bg={dark ? "whiteAlpha.50" : "blackAlpha.50"}>
+        <Box mt={[9, 10]} px={[5, 6]} py={[5, 6]} borderLeft="2px solid" borderColor="pink.400" bg={dark ? "whiteAlpha.50" : "blackAlpha.50"}>
           <Text fontSize="sm" fontWeight="700">{tr("과제 지표와 웹 런타임을 구분합니다.", "Course metrics and web runtime are separate evidence.")}</Text>
           <Text color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="xs" lineHeight="1.7" mt="1">
             {tr("README의 91.41% ViT 정확도와 CLIP Recall@K는 실행된 Colab 노트북의 측정값입니다.", "The 91.41% ViT accuracy and CLIP Recall@K in README come from the executed Colab notebooks.")}

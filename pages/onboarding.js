@@ -45,8 +45,9 @@ export default function Onboarding() {
 
       <Flex
         h="68px"
-        px={[4, 6, 8]}
+        px={[3, 6, 8]}
         align="center"
+        gap="1"
         borderBottom="1px solid"
         borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}
       >
@@ -56,7 +57,7 @@ export default function Onboarding() {
         <Button size="sm" variant="ghost" px="2" minW="34px" onClick={toggleColorMode}>{dark ? <SunIcon /> : <MoonIcon />}</Button>
       </Flex>
 
-      <Box maxW="1180px" mx="auto" px={[5, 7, 9]} py={[9, 12, 14]}>
+      <Box maxW="1180px" mx="auto" px={[5, 7, 9]} pt={[9, 12, 14]} pb={[12, 14, 16]}>
         <Flex direction={["column", "column", "row"]} gap={[8, 10, 14]} align="flex-start">
           <Box width={["100%", "100%", "34%"]} position={["static", "static", "sticky"]} top="94px">
             <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.16em">ONBOARDING</Text>

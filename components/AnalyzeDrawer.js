@@ -52,7 +52,7 @@ export default function AnalyzeDrawer({
           </Text>
         </DrawerHeader>
 
-        <DrawerBody px={[5, 7]} py="6">
+        <DrawerBody px={[5, 7]} pt="6" pb={[9, 10]}>
           <input
             ref={inputRef}
             type="file"
@@ -68,6 +68,7 @@ export default function AnalyzeDrawer({
               bg={dark ? "whiteAlpha.50" : "white"}
               borderRadius="16px"
               p={[7, 9]}
+              mb="2"
               textAlign="center"
             >
               <Box
@@ -83,7 +84,7 @@ export default function AnalyzeDrawer({
               />
               <Text fontWeight="700">{tr("반려동물이 잘 보이는 사진", "Choose a clear pet photo")}</Text>
               <Text color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="xs" mt="2">JPG, PNG, WebP · 12MB max</Text>
-              <Button mt="5" bg="pink.500" color="white" borderRadius="10px" _hover={{ bg: "pink.600" }} onClick={() => inputRef.current?.click()}>
+              <Button mt="6" minH="48px" px="6" bg="pink.500" color="white" borderRadius="10px" _hover={{ bg: "pink.600" }} onClick={() => inputRef.current?.click()}>
                 {tr("사진 선택", "Choose photo")}
               </Button>
             </Box>

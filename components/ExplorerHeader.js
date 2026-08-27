@@ -73,8 +73,8 @@ export default function ExplorerHeader({
           </Link>
 
           <Flex
-            ml={[2, 4, 5]}
-            mr={[1, 2, 3]}
+            ml={[0, 4, 5]}
+            mr={[0, 2, 3]}
             border="1px solid"
             borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"}
             borderRadius="10px"
@@ -109,7 +109,7 @@ export default function ExplorerHeader({
           <IconButton
             aria-label={dark ? "라이트 모드" : "다크 모드"}
             icon={dark ? <SunIcon /> : <MoonIcon />}
-            ml={[1, 2, 3]}
+            ml={[0, 2, 3]}
             size="sm"
             variant="ghost"
             color={dark ? "yellow.200" : "purple.700"}
@@ -143,7 +143,7 @@ export default function ExplorerHeader({
           >
             PetLens
           </DrawerHeader>
-          <DrawerBody py="5">
+          <DrawerBody pt="5" pb="8">
             <Flex direction="column" gap="2">
               <Button
                 as="a"

@@ -89,7 +89,8 @@ export default function PhotoDetail({ pic }) {
           borderTop={["1px solid", "1px solid", "0"]}
           borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}
           px={[5, 7]}
-          py={[6, 8]}
+          pt={[7, 8]}
+          pb={[10, 12]}
         >
           <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.16em">
             OXFORD-IIIT PET · REFERENCE
@@ -101,14 +102,14 @@ export default function PhotoDetail({ pic }) {
             {pic.species.toUpperCase()}
           </Text>
 
-          <Stack spacing="0" mt="8" borderTop="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
+          <Stack spacing="0" mt={[8, 9]} borderTop="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
             <InfoRow label={tr("데이터셋", "Dataset")} value="Oxford-IIIT Pet" dark={dark} />
             <InfoRow label={tr("분류 클래스", "Classes")} value="37" dark={dark} />
             <InfoRow label={tr("ViT 정확도", "ViT accuracy")} value="91.41%" dark={dark} />
             <InfoRow label={tr("Macro F1", "Macro F1")} value="91.32%" dark={dark} />
           </Stack>
 
-          <Box mt="8">
+          <Box mt={[9, 10]}>
             <Text fontWeight="700" fontSize="sm">{tr("이 화면은 무엇을 보여주나요?", "What does this view represent?")}</Text>
             <Text color={dark ? "whiteAlpha.600" : "gray.600"} fontSize="sm" lineHeight="1.75" mt="2">
               {tr(
@@ -118,9 +119,9 @@ export default function PhotoDetail({ pic }) {
             </Text>
           </Box>
 
-          <Flex mt="8" gap="3" direction={["column", "row", "column", "row"]}>
+          <Flex mt={[9, 10]} gap="4" direction={["column", "row", "column", "row"]}>
             <Link href="/" passHref>
-              <Button as="a" flex="1" borderRadius="10px" bg="pink.500" color="white" _hover={{ bg: "pink.600" }}>
+              <Button as="a" flex="1" minH="52px" borderRadius="12px" bg="pink.500" color="white" _hover={{ bg: "pink.600" }}>
                 {tr("갤러리로", "Gallery")}
               </Button>
             </Link>
@@ -130,7 +131,8 @@ export default function PhotoDetail({ pic }) {
               target="_blank"
               rel="noopener noreferrer"
               flex="1"
-              borderRadius="10px"
+              minH="52px"
+              borderRadius="12px"
               variant="outline"
               rightIcon={<ExternalLinkIcon />}
             >
@@ -145,7 +147,7 @@ export default function PhotoDetail({ pic }) {
 
 function InfoRow({ label, value, dark }) {
   return (
-    <Flex py="4" borderBottom="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"} align="baseline" gap="4">
+    <Flex py={[4, 5]} borderBottom="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"} align="baseline" gap="5">
       <Text flex="1" color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="xs">{label}</Text>
       <Text fontSize="sm" fontWeight="700">{value}</Text>
     </Flex>

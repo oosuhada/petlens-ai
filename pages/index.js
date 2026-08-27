@@ -439,7 +439,7 @@ export default function Home({ data }) {
         display={["inline-flex", "none"]}
         position="fixed"
         right="4"
-        bottom="4"
+        bottom="calc(16px + env(safe-area-inset-bottom))"
         zIndex="30"
         h="48px"
         px="4"

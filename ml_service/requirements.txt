@@ -1,0 +1,9 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+python-multipart>=0.0.20,<1
+pillow>=11,<12
+requests>=2.32,<3
+numpy>=2,<3
+torch>=2.6,<3
+transformers>=4.52,<5
+safetensors>=0.5,<1

@@ -28,6 +28,8 @@ PetLens는 한 장의 사진을 단일 품종 classifier에 넣는 데서 끝나
 | Video tracking | SAM2 Video로 영상 속 개체를 frame 간 추적 |
 | Action timeline | CLIP 장면 의미 + tracking motion을 결합해 시간대별 행동 후보 생성 |
 
+<img src="docs/screenshots/v2/web-01-home.png" alt="PetLens 2 home, semantic search, photo and video upload, and 37-reference gallery" width="900" />
+
 ---
 
 ## Image analysis pipeline
@@ -83,6 +85,10 @@ Dog-130 checkpoint가 설정되지 않았거나 로딩에 실패하면 API는 Pe
 - CLIP similarity ranking
 - optional SigLIP2 / DINOv2 / pose analysis
 
+<img src="docs/screenshots/v2/web-03-multipet-analysis.png" alt="PetLens 2 multi-pet photo analysis with cat and dog detection" width="900" />
+
+<img src="docs/screenshots/v2/web-04-analysis-details.png" alt="PetLens 2 Dog-130 prediction confidence and SAM2 segmentation details" width="900" />
+
 ---
 
 ## Video analysis pipeline
@@ -122,6 +128,8 @@ SAM2 Video tracking
 - action timeline
 
 현재 Mac mini production은 CPU serving이므로 실시간 스트리밍 분석이 아니라 **짧은 영상 업로드 후 결과를 기다리는 batch UX**를 사용합니다.
+
+<img src="docs/screenshots/v2/web-07-video-analysis.png" alt="PetLens 2 SAM2 video tracking and per-track Dog-130 analysis" width="900" />
 
 ---
 
@@ -166,6 +174,8 @@ Motion · High motion
 
 따라서 action score는 calibrated probability가 아닙니다. 장면 의미와 motion prior를 결합한 **zero-shot 상대 점수**이며, 애매한 구간은 행동을 강제로 지정하지 않습니다.
 
+<img src="docs/screenshots/v2/web-08-action-timeline.png" alt="PetLens 2 semantic action timeline for two tracked dogs" width="900" />
+
 ---
 
 ## Search and retrieval
@@ -189,6 +199,8 @@ semantic ranking
 
 CLIP score는 품종 확률이 아니라 embedding similarity입니다.
 
+<img src="docs/screenshots/v2/web-02-semantic-search.png" alt="PetLens 2 CLIP semantic search for a small white fluffy dog" width="900" />
+
 ### Image → Image
 
 분석된 pet crop을 CLIP image encoder에 넣고 같은 37개 reference gallery를 시각적 유사도 순으로 재정렬합니다.
@@ -202,6 +214,8 @@ Dog-130이 130개 품종을 분류하더라도 **reference gallery 자체는 37�
 ### SigLIP2 comparison
 
 `POST /open-set/siglip2`는 기존 classifier 결과와 SigLIP2 zero-shot 후보를 비교합니다. 두 모델의 불일치는 오답 확정이 아니라 ambiguity / open-set 탐색 신호로 사용합니다.
+
+<img src="docs/screenshots/v2/web-06-model-comparison.png" alt="PetLens 2 SigLIP2 zero-shot and CLIP DINOv2 retrieval comparison" width="900" />
 
 ---
 
@@ -222,6 +236,8 @@ Dog-130이 130개 품종을 분류하더라도 **reference gallery 자체는 37�
 - ankles
 
 웹 UI에서는 keypoint를 원본 이미지 위에 overlay해 표시합니다.
+
+<img src="docs/screenshots/v2/web-05-animal-pose.png" alt="PetLens 2 ViTPose++ AP-10K animal keypoint overlay" width="900" />
 
 ---
 
@@ -262,6 +278,11 @@ Dog branch는 `google/vit-base-patch16-224`를 `giacomov/tsinghua_dogs` 데이�
 | Eval batch size | **64** |
 | GPU | **NVIDIA A100-SXM4-40GB** |
 
+<p align="center">
+  <img src="docs/screenshots/dog130-training/dog130-01-a100-runtime.png" alt="Dog-130 NVIDIA A100 runtime" width="440" />
+  <img src="docs/screenshots/dog130-training/dog130-02-training-progress.png" alt="Dog-130 training progress" width="440" />
+</p>
+
 ### Validation metrics
 
 | Metric | Result |
@@ -270,6 +291,11 @@ Dog branch는 `google/vit-base-patch16-224`를 `giacomov/tsinghua_dogs` 데이�
 | Macro Precision | **0.8812951476** |
 | Macro Recall | **0.8678846154** |
 | Macro F1 | **0.8663649887** |
+
+<p align="center">
+  <img src="docs/screenshots/dog130-training/dog130-03-training-complete.png" alt="Dog-130 three-epoch training complete" width="440" />
+  <img src="docs/screenshots/dog130-training/dog130-04-final-metrics.png" alt="Dog-130 final metrics and production artifact verification" width="440" />
+</p>
 
 Training script:
 
@@ -346,6 +372,18 @@ Frontend는 Next.js + Chakra UI로 구성되어 있습니다.
 - light / dark mode
 
 Live demo: **https://petlens.oosu.dev/**
+
+### Breed reference detail
+
+갤러리의 품종 카드를 열면 Oxford-IIIT Pet reference 이미지와 데이터셋·분류 클래스·모델 평가 지표를 확인할 수 있습니다.
+
+<img src="docs/screenshots/v2/web-09-breed-detail.png" alt="PetLens 2 Newfoundland breed reference detail" width="900" />
+
+### Result guide
+
+가이드는 Dog-130 / Pet-37 routing, CLIP score, 영상 tracking과 semantic action timeline의 해석 기준을 설명합니다.
+
+<img src="docs/screenshots/v2/web-10-guide.png" alt="PetLens 2 result guide for Dog-130 and action timeline" width="900" />
 
 ---
 

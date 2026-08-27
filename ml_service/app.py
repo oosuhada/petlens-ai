@@ -49,6 +49,7 @@ DEFAULT_VIDEO_MODEL = "facebook/sam2-hiera-tiny"
 DEFAULT_POSE_MODEL = "usyd-community/vitpose-plus-base"
 
 VIT_MODEL = os.getenv("PETLENS_VIT_MODEL", DEFAULT_VIT_MODEL)
+DOG130_MODEL = os.getenv("PETLENS_DOG130_MODEL", "").strip() or None
 CLIP_MODEL_NAME = os.getenv("PETLENS_CLIP_MODEL", DEFAULT_CLIP_MODEL)
 DETECTOR_MODEL = os.getenv("PETLENS_DETECTOR_MODEL", DEFAULT_DETECTOR_MODEL)
 SEGMENTATION_MODEL = os.getenv("PETLENS_SEGMENTATION_MODEL", DEFAULT_SEGMENTATION_MODEL)
@@ -113,6 +114,9 @@ class Runtime:
     def __init__(self) -> None:
         self.vit_processor = None
         self.vit_model = None
+        self.dog130_processor = None
+        self.dog130_model = None
+        self.dog130_error: str | None = None
         self.clip_processor = None
         self.clip_model = None
         self.detector_processor = None
@@ -142,6 +146,21 @@ class Runtime:
         self.vit_processor = AutoImageProcessor.from_pretrained(VIT_MODEL)
         self.vit_model = AutoModelForImageClassification.from_pretrained(VIT_MODEL)
         self.vit_model = self.vit_model.to(DEVICE).eval()
+
+    def load_dog130(self) -> None:
+        if self.dog130_model is not None:
+            return
+        if not DOG130_MODEL:
+            raise RuntimeError("PETLENS_DOG130_MODEL is not configured.")
+        if self.dog130_error:
+            raise RuntimeError(self.dog130_error)
+        try:
+            self.dog130_processor = AutoImageProcessor.from_pretrained(DOG130_MODEL)
+            self.dog130_model = AutoModelForImageClassification.from_pretrained(DOG130_MODEL)
+            self.dog130_model = self.dog130_model.to(DEVICE).eval()
+        except Exception as exc:
+            self.dog130_error = str(exc)
+            raise
 
     def load_clip(self) -> None:
         if self.clip_model is not None:
@@ -230,20 +249,67 @@ class Runtime:
             self.pose_error = str(exc)
             raise
 
-    def classify(self, image: Image.Image) -> list[dict[str, Any]]:
-        self.load_vit()
-        inputs = self.vit_processor(images=image, return_tensors="pt")
+    def _classify_with_model(
+        self,
+        image: Image.Image,
+        processor: Any,
+        model: Any,
+    ) -> list[dict[str, Any]]:
+        inputs = processor(images=image, return_tensors="pt")
         inputs = {key: value.to(DEVICE) for key, value in inputs.items()}
         with torch.inference_mode():
-            logits = self.vit_model(**inputs).logits[0]
+            logits = model(**inputs).logits[0]
             probabilities = F.softmax(logits, dim=-1)
             values, indices = torch.topk(probabilities, k=min(5, probabilities.shape[-1]))
 
         results = []
         for value, index in zip(values.cpu().tolist(), indices.cpu().tolist()):
-            label = self.vit_model.config.id2label.get(index, str(index))
+            label = model.config.id2label.get(index, str(index))
             results.append({"label": str(label), "confidence": float(value)})
         return results
+
+    def classify(self, image: Image.Image) -> list[dict[str, Any]]:
+        self.load_vit()
+        return self._classify_with_model(image, self.vit_processor, self.vit_model)
+
+    def classify_subject(
+        self,
+        image: Image.Image,
+        species: str | None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        if species == "dog" and DOG130_MODEL:
+            try:
+                self.load_dog130()
+                return (
+                    self._classify_with_model(image, self.dog130_processor, self.dog130_model),
+                    {
+                        "scope": "dog130",
+                        "model": DOG130_MODEL,
+                        "fallback": False,
+                        "error": None,
+                    },
+                )
+            except Exception as exc:
+                predictions = self.classify(image)
+                return (
+                    predictions,
+                    {
+                        "scope": "pet37_fallback",
+                        "model": VIT_MODEL,
+                        "fallback": True,
+                        "error": str(exc),
+                    },
+                )
+
+        return (
+            self.classify(image),
+            {
+                "scope": "pet37",
+                "model": VIT_MODEL,
+                "fallback": False,
+                "error": None,
+            },
+        )
 
     @staticmethod
     def _normalize(features: torch.Tensor) -> torch.Tensor:
@@ -885,6 +951,10 @@ def health() -> dict[str, Any]:
         "device": str(DEVICE),
         "vit_model": VIT_MODEL,
         "vit_model_source": "user_checkpoint" if os.getenv("PETLENS_VIT_MODEL") else "public_fallback",
+        "dog130_model": DOG130_MODEL,
+        "dog130_configured": DOG130_MODEL is not None,
+        "dog130_ready": runtime.dog130_model is not None,
+        "dog130_error": runtime.dog130_error,
         "clip_model": CLIP_MODEL_NAME,
         "detector_model": DETECTOR_MODEL,
         "detector_ready": runtime.detector_model is not None,
@@ -1126,6 +1196,7 @@ async def analyze_video(
         representative_positions = sorted(set([0, len(timeline) // 2, len(timeline) - 1]))
         crops: list[Image.Image] = []
         frame_predictions: list[list[dict[str, Any]]] = []
+        frame_classifiers: list[dict[str, Any]] = []
         centers: list[tuple[float, float]] = []
         for position in representative_positions:
             entry = timeline[position]
@@ -1135,7 +1206,9 @@ async def analyze_video(
             box = entry["box"]
             crop = runtime._crop_with_padding(frames[sampled_frame_index], box, padding_ratio=0.04)
             crops.append(crop)
-            frame_predictions.append(runtime.classify(crop))
+            predictions_for_frame, classifier_for_frame = runtime.classify_subject(crop, track.get("species"))
+            frame_predictions.append(predictions_for_frame)
+            frame_classifiers.append(classifier_for_frame)
             centers.append(((box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0))
 
         predictions = runtime._aggregate_predictions(frame_predictions)
@@ -1177,6 +1250,7 @@ async def analyze_video(
             {
                 **track,
                 "timeline": enriched_timeline,
+                "classifier": frame_classifiers[0] if frame_classifiers else None,
                 "predictions": predictions,
                 "results": matches,
                 "motion": {
@@ -1196,7 +1270,8 @@ async def analyze_video(
         "models": {
             "detector": DETECTOR_MODEL,
             "tracker": VIDEO_MODEL,
-            "classifier": VIT_MODEL,
+            "classifier_pet37": VIT_MODEL,
+            "classifier_dog130": DOG130_MODEL,
             "retrieval": CLIP_MODEL_NAME,
         },
     }
@@ -1267,7 +1342,12 @@ async def analyze(
         ]
 
     try:
-        predictions_by_pet = [runtime.classify(crop) for crop in crops]
+        classified_subjects = [
+            runtime.classify_subject(crop, detections[index].get("species"))
+            for index, crop in enumerate(crops)
+        ]
+        predictions_by_pet = [item[0] for item in classified_subjects]
+        classifier_by_pet = [item[1] for item in classified_subjects]
         embeddings = runtime.image_embedding(crops)
         matches_by_pet = [
             runtime.rank(embeddings[index:index + 1], top_k)
@@ -1290,6 +1370,7 @@ async def analyze(
                 "fallback": bool(detection.get("fallback", False)),
                 "box": runtime._box_payload(detection["box"], width, height),
                 "segmentation": segmentation_by_pet[index],
+                "classifier": classifier_by_pet[index],
                 "open_set": open_set,
                 "predictions": predictions_by_pet[index],
                 "results": matches_by_pet[index],
@@ -1323,7 +1404,8 @@ async def analyze(
         "models": {
             "detector": DETECTOR_MODEL,
             "segmenter": SEGMENTATION_MODEL if SEGMENTATION_ENABLED else None,
-            "classifier": VIT_MODEL,
+            "classifier_pet37": VIT_MODEL,
+            "classifier_dog130": DOG130_MODEL,
             "retrieval": CLIP_MODEL_NAME,
         },
     }

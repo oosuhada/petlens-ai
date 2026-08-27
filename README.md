@@ -58,6 +58,17 @@ Oxford-IIIT Pet의 Newfoundland 샘플을 넣은 실제 로컬 검증에서는 N
 
 이 프로젝트의 핵심은 웹 UI 자체보다 **실제 학습·평가한 모델 작업을 서비스 인터랙션으로 연결한 과정**입니다.
 
+### Colab 실행 환경 요약
+
+원 과제 notebook 실행은 Colab GPU 런타임에서 진행했습니다. 20.2 ViT fine-tuning과 20.3 CLIP retrieval 평가는 T4 런타임에서 완료했고, 20.1 KLUE-NLI의 추가 성능 확장 실험은 더 많은 backbone 비교를 빠르게 돌리기 위해 A100 런타임에서 별도로 진행했습니다. GPU 종류 자체가 정확도를 올린다고 보지는 않고, 동일한 학습·평가를 더 빠르게 반복하기 위한 실행 환경 차이로 기록합니다.
+
+| Notebook / experiment | Main task | Colab GPU |
+| --- | --- | --- |
+| 20.1 BERT-NLI baseline | KLUE-NLI BERT fine-tuning | T4 |
+| 20.2 ViT-Pet | Oxford-IIIT Pet 37-class fine-tuning | T4 |
+| 20.3 ImageSearch | Flickr30k 1,000-image CLIP retrieval | T4 |
+| 20.1 NLI extension | BERT/RoBERTa/KorNLI 비교 실험 | A100 |
+
 ### ViT fine-tuning — Oxford-IIIT Pet
 
 `google/vit-base-patch16-224`를 37개 반려동물 품종으로 fine-tuning했습니다.
@@ -105,15 +116,15 @@ Oxford-IIIT Pet의 Newfoundland 샘플을 넣은 실제 로컬 검증에서는 N
 
 이미지 프로젝트와 별도로 KLUE-NLI도 진행했습니다. BERT에서 단순 하이퍼파라미터 변경만 반복하기보다 backbone과 학습 데이터의 영향을 비교했습니다.
 
-| Experiment | Accuracy | Macro F1 |
-| --- | ---: | ---: |
-| BERT baseline | 0.8017 | - |
-| BERT tuned best | 0.8080 | 0.8076 |
-| RoBERTa-base | 0.8343 | 0.8340 |
-| RoBERTa-large | 0.8510 | 0.8513 |
-| **RoBERTa-large + KorNLI** | **0.8647** | **0.8647** |
+| Experiment | Data | GPU | Accuracy | Macro F1 | Neutral Recall |
+| --- | --- | --- | ---: | ---: | ---: |
+| BERT baseline | KLUE-NLI | T4 | 0.8017 | - | - |
+| BERT tuned best | KLUE-NLI | A100 | 0.8080 | 0.8076 | 0.7930 |
+| RoBERTa-base | KLUE-NLI | A100 | 0.8343 | 0.8340 | 0.8700 |
+| RoBERTa-large | KLUE-NLI | A100 | 0.8510 | 0.8513 | 0.8860 |
+| **RoBERTa-large + KorNLI** | **KLUE-NLI + KorNLI human-translated train augmentation** | **A100** | **0.8647** | **0.8647** | **0.8790** |
 
-최종 확장 실험은 KLUE validation 3,000건을 평가 전용으로 유지하고, KorNLI human-translated 6,520건만 train 쪽에 추가했습니다.
+최종 확장 실험은 KLUE validation 3,000건을 평가 전용으로 유지하고, KorNLI human-translated 6,520건만 train 쪽에 추가했습니다. 기존 BERT 제출본은 보존하고, RoBERTa-large + KorNLI 결과는 별도 확장 제출 후보로 분리했습니다.
 
 <img src="docs/screenshots/colab-06-roberta-kornli-result.png" alt="RoBERTa large plus KorNLI" width="900" />
 

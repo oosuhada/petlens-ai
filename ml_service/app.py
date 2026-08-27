@@ -17,12 +17,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 from pydantic import BaseModel, Field
 from transformers import (
+    AutoModel,
     AutoImageProcessor,
     AutoModelForImageClassification,
     AutoModelForZeroShotObjectDetection,
     AutoProcessor,
     CLIPModel,
     CLIPProcessor,
+    Dinov2Model,
+    Sam2Model,
+    Sam2Processor,
 )
 
 
@@ -33,17 +37,32 @@ REMOTE_IMAGE_HEADERS = {"User-Agent": "PetLens academic demo/1.0 (local coursewo
 DEFAULT_VIT_MODEL = "rakib730/vit-base-oxford-iiit-pets"
 DEFAULT_CLIP_MODEL = "openai/clip-vit-large-patch14"
 DEFAULT_DETECTOR_MODEL = "IDEA-Research/grounding-dino-tiny"
+DEFAULT_SEGMENTATION_MODEL = "facebook/sam2-hiera-tiny"
+DEFAULT_DINO_MODEL = "facebook/dinov2-small"
+DEFAULT_SIGLIP2_MODEL = "google/siglip2-base-patch16-224"
 
 VIT_MODEL = os.getenv("PETLENS_VIT_MODEL", DEFAULT_VIT_MODEL)
 CLIP_MODEL_NAME = os.getenv("PETLENS_CLIP_MODEL", DEFAULT_CLIP_MODEL)
 DETECTOR_MODEL = os.getenv("PETLENS_DETECTOR_MODEL", DEFAULT_DETECTOR_MODEL)
+SEGMENTATION_MODEL = os.getenv("PETLENS_SEGMENTATION_MODEL", DEFAULT_SEGMENTATION_MODEL)
+SEGMENTATION_ENABLED = os.getenv("PETLENS_SEGMENTATION_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
+DINO_MODEL = os.getenv("PETLENS_DINO_MODEL", DEFAULT_DINO_MODEL)
+SIGLIP2_MODEL = os.getenv("PETLENS_SIGLIP2_MODEL", DEFAULT_SIGLIP2_MODEL)
 DETECTION_THRESHOLD = float(os.getenv("PETLENS_DETECTION_THRESHOLD", "0.32"))
 DETECTION_TEXT_THRESHOLD = float(os.getenv("PETLENS_DETECTION_TEXT_THRESHOLD", "0.25"))
 DETECTION_LABELS = ["dog", "cat"]
+UNKNOWN_TOP1_THRESHOLD = float(os.getenv("PETLENS_UNKNOWN_TOP1_THRESHOLD", "0.55"))
+UNKNOWN_MARGIN_THRESHOLD = float(os.getenv("PETLENS_UNKNOWN_MARGIN_THRESHOLD", "0.12"))
 GALLERY_CACHE_PATH = Path(
     os.getenv(
         "PETLENS_GALLERY_CACHE",
         str(ROOT / ".cache" / f"gallery-{CLIP_MODEL_NAME.replace('/', '--')}.npy"),
+    )
+)
+DINO_GALLERY_CACHE_PATH = Path(
+    os.getenv(
+        "PETLENS_DINO_GALLERY_CACHE",
+        str(ROOT / ".cache" / f"gallery-{DINO_MODEL.replace('/', '--')}.npy"),
     )
 )
 CORS_ORIGINS = [
@@ -88,6 +107,16 @@ class Runtime:
         self.detector_processor = None
         self.detector_model = None
         self.detector_error: str | None = None
+        self.segmenter_processor = None
+        self.segmenter_model = None
+        self.segmenter_error: str | None = None
+        self.dino_processor = None
+        self.dino_model = None
+        self.dino_error: str | None = None
+        self.dino_gallery_embeddings: np.ndarray | None = None
+        self.siglip2_processor = None
+        self.siglip2_model = None
+        self.siglip2_error: str | None = None
         self.gallery_embeddings: np.ndarray | None = None
 
     def load_vit(self) -> None:
@@ -115,6 +144,47 @@ class Runtime:
             self.detector_model = self.detector_model.to(DEVICE).eval()
         except Exception as exc:
             self.detector_error = str(exc)
+            raise
+
+    def load_segmenter(self) -> None:
+        if self.segmenter_model is not None:
+            return
+        if not SEGMENTATION_ENABLED:
+            raise RuntimeError("SAM2 segmentation is disabled by PETLENS_SEGMENTATION_ENABLED.")
+        if self.segmenter_error:
+            raise RuntimeError(self.segmenter_error)
+        try:
+            self.segmenter_processor = Sam2Processor.from_pretrained(SEGMENTATION_MODEL)
+            self.segmenter_model = Sam2Model.from_pretrained(SEGMENTATION_MODEL)
+            self.segmenter_model = self.segmenter_model.to(DEVICE).eval()
+        except Exception as exc:
+            self.segmenter_error = str(exc)
+            raise
+
+    def load_dino(self) -> None:
+        if self.dino_model is not None:
+            return
+        if self.dino_error:
+            raise RuntimeError(self.dino_error)
+        try:
+            self.dino_processor = AutoImageProcessor.from_pretrained(DINO_MODEL)
+            self.dino_model = Dinov2Model.from_pretrained(DINO_MODEL)
+            self.dino_model = self.dino_model.to(DEVICE).eval()
+        except Exception as exc:
+            self.dino_error = str(exc)
+            raise
+
+    def load_siglip2(self) -> None:
+        if self.siglip2_model is not None:
+            return
+        if self.siglip2_error:
+            raise RuntimeError(self.siglip2_error)
+        try:
+            self.siglip2_processor = AutoProcessor.from_pretrained(SIGLIP2_MODEL)
+            self.siglip2_model = AutoModel.from_pretrained(SIGLIP2_MODEL)
+            self.siglip2_model = self.siglip2_model.to(DEVICE).eval()
+        except Exception as exc:
+            self.siglip2_error = str(exc)
             raise
 
     def classify(self, image: Image.Image) -> list[dict[str, Any]]:
@@ -163,6 +233,56 @@ class Runtime:
             features = self._normalize(features)
         return features.detach().cpu().numpy().astype(np.float32)
 
+    def dino_embedding(self, images: list[Image.Image]) -> np.ndarray:
+        self.load_dino()
+        inputs = self.dino_processor(images=images, return_tensors="pt")
+        pixel_values = inputs["pixel_values"].to(DEVICE)
+        with torch.inference_mode():
+            outputs = self.dino_model(pixel_values=pixel_values)
+            features = outputs.pooler_output
+            features = self._normalize(features)
+        return features.detach().cpu().numpy().astype(np.float32)
+
+    def siglip2_zero_shot(
+        self,
+        image: Image.Image,
+        top_k: int = 5,
+        species: str | None = None,
+    ) -> list[dict[str, Any]]:
+        self.load_siglip2()
+        candidates = [
+            pet for pet in CATALOG
+            if species not in {"dog", "cat"} or pet["species"] == species
+        ]
+        prompts = [pet["breed"] for pet in candidates]
+        inputs = self.siglip2_processor(
+            text=prompts,
+            images=image,
+            padding="max_length",
+            return_tensors="pt",
+        )
+        model_inputs = {
+            key: value.to(DEVICE) if hasattr(value, "to") else value
+            for key, value in inputs.items()
+        }
+        with torch.inference_mode():
+            outputs = self.siglip2_model(**model_inputs)
+            scores = torch.sigmoid(outputs.logits_per_image[0])
+            values, indices = torch.topk(scores, k=min(top_k, scores.shape[-1]))
+
+        results: list[dict[str, Any]] = []
+        for value, index in zip(values.detach().cpu().tolist(), indices.detach().cpu().tolist()):
+            pet = candidates[int(index)]
+            results.append(
+                {
+                    "id": pet["id"],
+                    "breed": pet["breed"],
+                    "species": pet["species"],
+                    "score": float(value),
+                }
+            )
+        return results
+
     def ensure_gallery_index(self) -> None:
         if self.gallery_embeddings is not None:
             return
@@ -199,6 +319,46 @@ class Runtime:
     def rank(self, query_embedding: np.ndarray, top_k: int) -> list[dict[str, Any]]:
         self.ensure_gallery_index()
         scores = query_embedding @ self.gallery_embeddings.T
+        scores = scores[0]
+        indices = np.argsort(-scores)[:top_k]
+        return [
+            {"id": CATALOG[int(index)]["id"], "score": float(scores[int(index)])}
+            for index in indices
+        ]
+
+    def ensure_dino_gallery_index(self) -> None:
+        if self.dino_gallery_embeddings is not None:
+            return
+
+        if DINO_GALLERY_CACHE_PATH.exists():
+            try:
+                cached = np.load(DINO_GALLERY_CACHE_PATH)
+                if cached.ndim == 2 and cached.shape[0] == len(CATALOG):
+                    self.dino_gallery_embeddings = cached.astype(np.float32)
+                    return
+            except Exception:
+                pass
+
+        def load_catalog_image(pet: dict[str, Any]) -> Image.Image:
+            response = requests.get(pet["image"], headers=REMOTE_IMAGE_HEADERS, timeout=20)
+            response.raise_for_status()
+            return Image.open(io.BytesIO(response.content)).convert("RGB")
+
+        with ThreadPoolExecutor(max_workers=min(8, len(CATALOG))) as executor:
+            gallery_images = list(executor.map(load_catalog_image, CATALOG))
+
+        embeddings: list[np.ndarray] = []
+        batch_size = 8
+        for start in range(0, len(gallery_images), batch_size):
+            embeddings.append(self.dino_embedding(gallery_images[start:start + batch_size]))
+
+        self.dino_gallery_embeddings = np.concatenate(embeddings, axis=0)
+        DINO_GALLERY_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        np.save(DINO_GALLERY_CACHE_PATH, self.dino_gallery_embeddings)
+
+    def rank_dino(self, query_embedding: np.ndarray, top_k: int) -> list[dict[str, Any]]:
+        self.ensure_dino_gallery_index()
+        scores = query_embedding @ self.dino_gallery_embeddings.T
         scores = scores[0]
         indices = np.argsort(-scores)[:top_k]
         return [
@@ -269,6 +429,67 @@ class Runtime:
         )
         return image.crop(crop_box)
 
+    def segment_pet_crops(
+        self,
+        image: Image.Image,
+        detections: list[dict[str, Any]],
+    ) -> tuple[list[Image.Image], list[dict[str, Any]]]:
+        if not detections or any(detection.get("fallback") for detection in detections):
+            crops = [self._crop_with_padding(image, detection["box"]) for detection in detections]
+            metadata = [
+                {
+                    "status": "fallback_crop",
+                    "model": None,
+                    "iou_score": None,
+                    "mask_area_ratio": None,
+                }
+                for _ in detections
+            ]
+            return crops, metadata
+
+        self.load_segmenter()
+        boxes = [[float(value) for value in detection["box"]] for detection in detections]
+        inputs = self.segmenter_processor(
+            images=image,
+            input_boxes=[boxes],
+            return_tensors="pt",
+        )
+        model_inputs = {
+            key: value.to(DEVICE) if hasattr(value, "to") else value
+            for key, value in inputs.items()
+        }
+        with torch.inference_mode():
+            outputs = self.segmenter_model(**model_inputs, multimask_output=False)
+
+        masks = self.segmenter_processor.post_process_masks(
+            outputs.pred_masks,
+            inputs["original_sizes"],
+        )[0]
+        iou_scores = outputs.iou_scores.detach().cpu().reshape(-1).tolist()
+        crops: list[Image.Image] = []
+        metadata: list[dict[str, Any]] = []
+
+        for index, detection in enumerate(detections):
+            mask_tensor = masks[index][0].detach().cpu()
+            mask_array = mask_tensor.numpy().astype(np.uint8) * 255
+            mask_image = Image.fromarray(mask_array, mode="L")
+            neutral_background = Image.new("RGB", image.size, (244, 244, 244))
+            segmented = Image.composite(image, neutral_background, mask_image)
+            crop = self._crop_with_padding(segmented, detection["box"])
+            crop_mask = self._crop_with_padding(mask_image.convert("RGB"), detection["box"]).convert("L")
+            mask_ratio = float(np.asarray(crop_mask, dtype=np.uint8).mean() / 255.0)
+            crops.append(crop)
+            metadata.append(
+                {
+                    "status": "segmented",
+                    "model": SEGMENTATION_MODEL,
+                    "iou_score": float(iou_scores[index]) if index < len(iou_scores) else None,
+                    "mask_area_ratio": mask_ratio,
+                }
+            )
+
+        return crops, metadata
+
     def detect_pets(self, image: Image.Image, max_pets: int = 6) -> list[dict[str, Any]]:
         self.load_detector()
         width, height = image.size
@@ -325,6 +546,39 @@ class Runtime:
                 break
         return selected
 
+    @staticmethod
+    def assess_open_set(
+        predictions: list[dict[str, Any]],
+        matches: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        top1 = float(predictions[0]["confidence"]) if predictions else 0.0
+        top2 = float(predictions[1]["confidence"]) if len(predictions) > 1 else 0.0
+        margin = max(0.0, top1 - top2)
+        retrieval_score = float(matches[0]["score"]) if matches else None
+        low_top1 = top1 < UNKNOWN_TOP1_THRESHOLD
+        low_margin = margin < UNKNOWN_MARGIN_THRESHOLD
+        uncertain = low_top1 or (top1 < 0.72 and low_margin)
+        reasons: list[str] = []
+        if low_top1:
+            reasons.append("low_vit_top1_confidence")
+        if low_margin:
+            reasons.append("small_vit_top1_top2_margin")
+        return {
+            "status": "uncertain_out_of_set" if uncertain else "supported_candidate",
+            "is_uncertain": uncertain,
+            "vit_top1_confidence": top1,
+            "vit_top1_top2_margin": margin,
+            "clip_top1_similarity": retrieval_score,
+            "thresholds": {
+                "top1_confidence": UNKNOWN_TOP1_THRESHOLD,
+                "top1_top2_margin": UNKNOWN_MARGIN_THRESHOLD,
+            },
+            "reasons": reasons,
+            "note": (
+                "Baseline heuristic only; this is not a calibrated open-set probability."
+            ),
+        }
+
 
 runtime = Runtime()
 
@@ -365,6 +619,22 @@ def health() -> dict[str, Any]:
         "detector_model": DETECTOR_MODEL,
         "detector_ready": runtime.detector_model is not None,
         "detector_error": runtime.detector_error,
+        "segmentation_enabled": SEGMENTATION_ENABLED,
+        "segmentation_model": SEGMENTATION_MODEL,
+        "segmentation_ready": runtime.segmenter_model is not None,
+        "segmentation_error": runtime.segmenter_error,
+        "unknown_baseline": {
+            "top1_threshold": UNKNOWN_TOP1_THRESHOLD,
+            "margin_threshold": UNKNOWN_MARGIN_THRESHOLD,
+        },
+        "dino_model": DINO_MODEL,
+        "dino_ready": runtime.dino_model is not None,
+        "dino_error": runtime.dino_error,
+        "dino_gallery_index_ready": runtime.dino_gallery_embeddings is not None,
+        "dino_gallery_cache_ready": DINO_GALLERY_CACHE_PATH.exists(),
+        "siglip2_model": SIGLIP2_MODEL,
+        "siglip2_ready": runtime.siglip2_model is not None,
+        "siglip2_error": runtime.siglip2_error,
         "gallery_size": len(CATALOG),
         "gallery_index_ready": runtime.gallery_embeddings is not None,
         "gallery_cache_ready": GALLERY_CACHE_PATH.exists(),
@@ -409,6 +679,108 @@ async def search_image(
     return {"results": results, "model": CLIP_MODEL_NAME}
 
 
+@app.post("/compare/retrieval")
+async def compare_retrieval(
+    file: UploadFile = File(...),
+    top_k: int = Query(default=12, ge=1, le=37),
+) -> dict[str, Any]:
+    image = await read_image(file)
+    try:
+        detections = runtime.detect_pets(image, max_pets=1)
+    except Exception:
+        detections = []
+
+    if detections:
+        try:
+            subjects, segmentation_meta = runtime.segment_pet_crops(image, detections[:1])
+            subject = subjects[0]
+            subject_mode = "detected_segmented_pet"
+            segmentation = segmentation_meta[0]
+        except Exception:
+            subject = runtime._crop_with_padding(image, detections[0]["box"])
+            subject_mode = "detected_box_crop"
+            segmentation = None
+    else:
+        subject = image
+        subject_mode = "full_image"
+        segmentation = None
+
+    try:
+        clip_query = runtime.image_embedding([subject])
+        dino_query = runtime.dino_embedding([subject])
+        clip_results = runtime.rank(clip_query, top_k)
+        dino_results = runtime.rank_dino(dino_query, top_k)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Retrieval comparison unavailable: {exc}") from exc
+
+    return {
+        "subject_mode": subject_mode,
+        "segmentation": segmentation,
+        "clip": {"model": CLIP_MODEL_NAME, "results": clip_results},
+        "dino": {"model": DINO_MODEL, "results": dino_results},
+    }
+
+
+@app.post("/open-set/siglip2")
+async def open_set_siglip2(
+    file: UploadFile = File(...),
+    top_k: int = Query(default=5, ge=1, le=12),
+) -> dict[str, Any]:
+    image = await read_image(file)
+    try:
+        detections = runtime.detect_pets(image, max_pets=1)
+    except Exception:
+        detections = []
+
+    if detections:
+        detected_species = detections[0].get("species")
+        try:
+            subjects, segmentation_meta = runtime.segment_pet_crops(image, detections[:1])
+            subject = subjects[0]
+            subject_mode = "detected_segmented_pet"
+            segmentation = segmentation_meta[0]
+        except Exception:
+            subject = runtime._crop_with_padding(image, detections[0]["box"])
+            subject_mode = "detected_box_crop"
+            segmentation = None
+    else:
+        detected_species = None
+        subject = image
+        subject_mode = "full_image"
+        segmentation = None
+
+    try:
+        vit_predictions = runtime.classify(subject)
+        siglip_results = runtime.siglip2_zero_shot(
+            subject,
+            top_k=top_k,
+            species=detected_species,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"SigLIP2 open-set comparison unavailable: {exc}") from exc
+
+    vit_top = vit_predictions[0] if vit_predictions else None
+    siglip_top = siglip_results[0] if siglip_results else None
+    same_top1 = bool(
+        vit_top
+        and siglip_top
+        and str(vit_top["label"]).strip().lower().replace(" ", "_") == siglip_top["id"].lower()
+    )
+    return {
+        "subject_mode": subject_mode,
+        "detected_species": detected_species,
+        "segmentation": segmentation,
+        "vit": {"model": VIT_MODEL, "predictions": vit_predictions},
+        "siglip2": {"model": SIGLIP2_MODEL, "results": siglip_results},
+        "agreement": {
+            "same_top1": same_top1,
+            "vit_top1": vit_top,
+            "siglip2_top1": siglip_top,
+            "note": "This is a zero-shot comparison, not a calibrated unknown-breed probability.",
+        },
+    }
+
+
 @app.post("/analyze")
 async def analyze(
     file: UploadFile = File(...),
@@ -439,7 +811,40 @@ async def analyze(
             }
         ]
 
-    crops = [runtime._crop_with_padding(image, detection["box"]) for detection in detections]
+    segmentation_status = "disabled"
+    segmentation_error = None
+    if SEGMENTATION_ENABLED and not any(detection.get("fallback") for detection in detections):
+        try:
+            crops, segmentation_by_pet = runtime.segment_pet_crops(image, detections)
+            segmentation_status = "segmented"
+        except Exception as exc:
+            segmentation_status = "segmenter_unavailable_fallback"
+            segmentation_error = str(exc)
+            crops = [runtime._crop_with_padding(image, detection["box"]) for detection in detections]
+            segmentation_by_pet = [
+                {
+                    "status": "box_crop_fallback",
+                    "model": None,
+                    "iou_score": None,
+                    "mask_area_ratio": None,
+                }
+                for _ in detections
+            ]
+    elif any(detection.get("fallback") for detection in detections):
+        crops, segmentation_by_pet = runtime.segment_pet_crops(image, detections)
+        segmentation_status = "fallback_crop"
+    else:
+        crops = [runtime._crop_with_padding(image, detection["box"]) for detection in detections]
+        segmentation_by_pet = [
+            {
+                "status": "disabled_box_crop",
+                "model": None,
+                "iou_score": None,
+                "mask_area_ratio": None,
+            }
+            for _ in detections
+        ]
+
     try:
         predictions_by_pet = [runtime.classify(crop) for crop in crops]
         embeddings = runtime.image_embedding(crops)
@@ -452,6 +857,10 @@ async def analyze(
 
     pets: list[dict[str, Any]] = []
     for index, detection in enumerate(detections):
+        open_set = runtime.assess_open_set(
+            predictions_by_pet[index],
+            matches_by_pet[index],
+        )
         pets.append(
             {
                 "id": f"pet-{index + 1}",
@@ -459,6 +868,8 @@ async def analyze(
                 "detector_score": detection.get("score"),
                 "fallback": bool(detection.get("fallback", False)),
                 "box": runtime._box_payload(detection["box"], width, height),
+                "segmentation": segmentation_by_pet[index],
+                "open_set": open_set,
                 "predictions": predictions_by_pet[index],
                 "results": matches_by_pet[index],
             }
@@ -475,14 +886,22 @@ async def analyze(
             "threshold": DETECTION_THRESHOLD,
             "error": detection_error,
         },
+        "segmentation": {
+            "status": segmentation_status,
+            "enabled": SEGMENTATION_ENABLED,
+            "model": SEGMENTATION_MODEL if SEGMENTATION_ENABLED else None,
+            "error": segmentation_error,
+        },
         "detected_pet_count": detected_pet_count,
         "analysis_subject_count": len(pets),
         "primary_pet_id": primary_pet["id"],
         "pets": pets,
+        "open_set": primary_pet["open_set"],
         "predictions": primary_pet["predictions"],
         "results": primary_pet["results"],
         "models": {
             "detector": DETECTOR_MODEL,
+            "segmenter": SEGMENTATION_MODEL if SEGMENTATION_ENABLED else None,
             "classifier": VIT_MODEL,
             "retrieval": CLIP_MODEL_NAME,
         },

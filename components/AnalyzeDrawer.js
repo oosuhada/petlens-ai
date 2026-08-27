@@ -27,6 +27,13 @@ export default function AnalyzeDrawer({
   previewUrl,
   analysis,
   analysisError,
+  siglipComparison,
+  retrievalComparison,
+  advancedError,
+  isSiglipComparing,
+  isRetrievalComparing,
+  onSiglipCompare,
+  onRetrievalCompare,
   tr,
 }) {
   const inputRef = useRef(null);
@@ -37,6 +44,8 @@ export default function AnalyzeDrawer({
   const selectedPet = detectedPets.find((pet) => pet.id === selectedPetId) || detectedPets[0] || null;
   const selectedPredictions = selectedPet?.predictions || analysis?.predictions || [];
   const topPrediction = selectedPredictions[0];
+  const selectedSegmentation = selectedPet?.segmentation || null;
+  const selectedOpenSet = selectedPet?.open_set || analysis?.open_set || null;
 
   return (
     <Drawer isOpen={isOpen} placement="right" size="md" onClose={onClose} finalFocusRef={inputRef}>
@@ -45,15 +54,15 @@ export default function AnalyzeDrawer({
         <DrawerCloseButton top="4" right="4" />
         <DrawerHeader px={[5, 7]} pt="6" pb="4" borderBottom="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
           <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.16em" mb="2">
-            PETLENS 2.0 · DETECT + VIT + CLIP
+            PETLENS 2.0 · DETECT + SAM2 + VIT + CLIP
           </Text>
           <Text fontSize="2xl" fontWeight="800" letterSpacing="-0.035em">
             {tr("사진 속 반려동물을 분석하세요", "Analyze the pets in your photo")}
           </Text>
           <Text color={dark ? "whiteAlpha.600" : "gray.500"} fontSize="sm" fontWeight="400" lineHeight="1.65" mt="2" pr="8">
             {tr(
-              "사진에서 고양이와 강아지를 먼저 찾고, 감지된 개체마다 ViT Top-5와 CLIP 유사 이미지 검색을 실행합니다.",
-              "PetLens detects cats and dogs first, then runs ViT top-5 classification and CLIP similarity retrieval for each detected pet."
+              "사진에서 고양이와 강아지를 찾고 SAM2로 배경을 분리한 뒤, 개체마다 ViT Top-5와 CLIP 유사 이미지 검색을 실행합니다.",
+              "PetLens detects cats and dogs, isolates each pet with SAM2, then runs ViT top-5 classification and CLIP similarity retrieval."
             )}
           </Text>
         </DrawerHeader>
@@ -172,6 +181,14 @@ export default function AnalyzeDrawer({
                         ? tr("각 개체를 따로 잘라 ViT 품종 예측과 CLIP 유사 이미지 검색을 실행했습니다.", "Each detected pet was cropped and analyzed independently with ViT and CLIP.")
                         : tr("감지된 반려동물 영역을 기준으로 품종과 유사 이미지를 분석합니다.", "Breed and similarity results are computed from the detected pet region.")}
                     </Text>
+                    {analysis?.segmentation?.status === "segmented" && (
+                      <Text mt="2" fontSize="xs" lineHeight="1.6" color={dark ? "whiteAlpha.600" : "gray.600"}>
+                        {tr(
+                          "SAM2 마스크로 배경을 줄인 개체 이미지를 분류와 유사도 검색에 사용했습니다.",
+                          "SAM2 masks were used to reduce background before classification and retrieval."
+                        )}
+                      </Text>
+                    )}
                   </Box>
 
                   {detectedPets.length > 1 && (
@@ -222,6 +239,11 @@ export default function AnalyzeDrawer({
                               <Text mt="2" color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="xs" lineHeight="1.6">
                                 {(pet.predictions || []).slice(1, 3).map((prediction) => `${prediction.label} ${(prediction.confidence * 100).toFixed(1)}%`).join(" · ")}
                               </Text>
+                              {pet.open_set?.is_uncertain && (
+                                <Text mt="2" color={dark ? "orange.200" : "orange.600"} fontSize="xs" fontWeight="700">
+                                  {tr("지원 품종 밖일 가능성 · 결과를 후보로만 확인하세요", "Possibly outside the supported breed set · treat this as a candidate")}
+                                </Text>
+                              )}
                             </Box>
                           );
                         })}
@@ -241,6 +263,34 @@ export default function AnalyzeDrawer({
                     <Text ml="4" color="pink.500" fontSize="2xl" fontWeight="800">{(topPrediction?.confidence * 100).toFixed(1)}%</Text>
                   </Flex>
 
+                  {selectedSegmentation?.status === "segmented" && (
+                    <Box mb="5" px="4" py="3" borderRadius="10px" bg={dark ? "whiteAlpha.50" : "blackAlpha.50"}>
+                      <Text fontSize="xs" fontWeight="800" color="purple.400">
+                        SAM2 · SEGMENTED SUBJECT
+                      </Text>
+                      <Text mt="1" fontSize="xs" color={dark ? "whiteAlpha.600" : "gray.600"}>
+                        {tr(
+                          `마스크 품질 점수 ${(selectedSegmentation.iou_score * 100).toFixed(1)}% · 선택 crop의 ${(selectedSegmentation.mask_area_ratio * 100).toFixed(0)}%가 반려동물 영역입니다.`,
+                          `Mask quality ${(selectedSegmentation.iou_score * 100).toFixed(1)}% · ${(selectedSegmentation.mask_area_ratio * 100).toFixed(0)}% of the selected crop is pet foreground.`
+                        )}
+                      </Text>
+                    </Box>
+                  )}
+
+                  {selectedOpenSet?.is_uncertain && (
+                    <Box mb="5" px="4" py="3" borderRadius="10px" border="1px solid" borderColor={dark ? "orange.300" : "orange.200"} bg={dark ? "rgba(192,86,33,0.12)" : "orange.50"}>
+                      <Text fontSize="xs" fontWeight="800" color={dark ? "orange.200" : "orange.700"}>
+                        {tr("37개 지원 품종 밖일 가능성", "POSSIBLY OUTSIDE THE 37 SUPPORTED BREEDS")}
+                      </Text>
+                      <Text mt="1" fontSize="xs" lineHeight="1.65" color={dark ? "whiteAlpha.700" : "gray.700"}>
+                        {tr(
+                          "ViT의 1위 확률이나 1·2위 차이가 작습니다. 현재는 보수적인 baseline 경고이며 확정적인 unknown 판정은 아닙니다.",
+                          "The ViT top-1 confidence or top-1/top-2 margin is low. This is a conservative baseline warning, not a calibrated unknown-breed probability."
+                        )}
+                      </Text>
+                    </Box>
+                  )}
+
                   <Stack spacing="3.5">
                     {selectedPredictions.map((prediction, index) => (
                       <Box key={`${prediction.label}-${index}`}>
@@ -252,6 +302,98 @@ export default function AnalyzeDrawer({
                       </Box>
                     ))}
                   </Stack>
+
+                  <Box mt="7" pt="6" borderTop="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
+                    <Text fontSize="sm" fontWeight="800">
+                      {tr("고급 모델 비교", "Advanced model comparison")}
+                    </Text>
+                    <Text mt="1.5" fontSize="xs" lineHeight="1.65" color={dark ? "whiteAlpha.500" : "gray.500"}>
+                      {tr(
+                        "필요할 때만 추가 모델을 로드합니다. SigLIP2는 37개 지원 품종을 zero-shot으로 다시 비교하고, DINOv2는 CLIP과 다른 시각 특징 공간의 검색 순위를 보여줍니다.",
+                        "Extra models are loaded only on demand. SigLIP2 re-checks the 37 supported breeds zero-shot, while DINOv2 provides a visual retrieval ranking from a different feature space than CLIP."
+                      )}
+                    </Text>
+
+                    <Stack direction={["column", "row"]} spacing="3" mt="4">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        borderRadius="10px"
+                        isLoading={isSiglipComparing}
+                        loadingText="SigLIP2"
+                        onClick={onSiglipCompare}
+                      >
+                        {tr("SigLIP2 보조 판정", "Run SigLIP2 check")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        borderRadius="10px"
+                        isLoading={isRetrievalComparing}
+                        loadingText="DINOv2"
+                        onClick={onRetrievalCompare}
+                      >
+                        {tr("CLIP · DINOv2 비교", "Compare CLIP · DINOv2")}
+                      </Button>
+                    </Stack>
+
+                    {advancedError && (
+                      <Text mt="3" fontSize="xs" color={dark ? "red.200" : "red.600"}>
+                        {advancedError}
+                      </Text>
+                    )}
+
+                    {siglipComparison && (
+                      <Box mt="5" px="4" py="4" borderRadius="12px" bg={dark ? "#19151d" : "white"} border="1px solid" borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"}>
+                        <Text fontSize="10px" fontWeight="800" letterSpacing="0.1em" color="pink.500">
+                          SIGLIP2 · ZERO-SHOT
+                        </Text>
+                        <Text mt="2" fontSize="sm" fontWeight="700">
+                          {siglipComparison.agreement?.same_top1
+                            ? tr("ViT와 SigLIP2의 1순위가 일치합니다.", "ViT and SigLIP2 agree on the top-1 breed.")
+                            : tr("ViT와 SigLIP2의 1순위가 다릅니다.", "ViT and SigLIP2 disagree on the top-1 breed.")}
+                        </Text>
+                        <Stack spacing="2" mt="3">
+                          {(siglipComparison.siglip2?.results || []).slice(0, 3).map((item, index) => (
+                            <Flex key={`${item.id}-${index}`} align="baseline">
+                              <Text flex="1" fontSize="xs" textTransform="capitalize">
+                                {index + 1}. {item.breed}
+                              </Text>
+                              <Text ml="3" fontSize="xs" fontWeight="700" color="pink.500">
+                                {(item.score * 100).toFixed(1)}%
+                              </Text>
+                            </Flex>
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    {retrievalComparison && (
+                      <Box mt="5" px="4" py="4" borderRadius="12px" bg={dark ? "#19151d" : "white"} border="1px solid" borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"}>
+                        <Text fontSize="10px" fontWeight="800" letterSpacing="0.1em" color="purple.400">
+                          CLIP · DINOV2 RETRIEVAL
+                        </Text>
+                        <Flex mt="3" align="flex-start">
+                          <Box flex="1" minW="0">
+                            <Text fontSize="xs" fontWeight="800">CLIP</Text>
+                            {(retrievalComparison.clip?.matches || []).slice(0, 3).map((item, index) => (
+                              <Text key={`clip-${item.id}-${index}`} mt="1.5" fontSize="xs" color={dark ? "whiteAlpha.600" : "gray.600"} noOfLines={1}>
+                                {index + 1}. {item.breed}
+                              </Text>
+                            ))}
+                          </Box>
+                          <Box flex="1" minW="0" ml="6">
+                            <Text fontSize="xs" fontWeight="800">DINOv2</Text>
+                            {(retrievalComparison.dino?.matches || []).slice(0, 3).map((item, index) => (
+                              <Text key={`dino-${item.id}-${index}`} mt="1.5" fontSize="xs" color={dark ? "whiteAlpha.600" : "gray.600"} noOfLines={1}>
+                                {index + 1}. {item.breed}
+                              </Text>
+                            ))}
+                          </Box>
+                        </Flex>
+                      </Box>
+                    )}
+                  </Box>
 
                   <Box mt="6" pt="5" borderTop="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
                     <Text fontSize="sm" fontWeight="700">{tr("갤러리가 유사도 순으로 바뀌었습니다", "The gallery is now ranked by similarity")}</Text>

@@ -24,6 +24,8 @@ import usePetLensLocale from "../hooks/usePetLensLocale";
 import useReducedMotionPreference from "../hooks/useReducedMotionPreference";
 import {
   analyzePet,
+  compareRetrievalModels,
+  compareSiglip2OpenSet,
   getCuratedPhotos,
   getQueryPhotos,
 } from "../lib/api";
@@ -44,10 +46,16 @@ export default function Home({ data }) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
+  const [analysisFile, setAnalysisFile] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [selectedPetId, setSelectedPetId] = useState("");
   const [analysisError, setAnalysisError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [siglipComparison, setSiglipComparison] = useState(null);
+  const [retrievalComparison, setRetrievalComparison] = useState(null);
+  const [advancedError, setAdvancedError] = useState("");
+  const [isSiglipComparing, setIsSiglipComparing] = useState(false);
+  const [isRetrievalComparing, setIsRetrievalComparing] = useState(false);
 
   const featured = useMemo(
     () => ["samoyed", "newfoundland", "ragdoll"].map((id) => data.find((photo) => photo.id === id)).filter(Boolean),
@@ -66,6 +74,9 @@ export default function Home({ data }) {
     setSpeciesFilter("all");
     setSearchError("");
     setSelectedPetId("");
+    setSiglipComparison(null);
+    setRetrievalComparison(null);
+    setAdvancedError("");
   };
 
   const handleSearch = async (event) => {
@@ -113,8 +124,12 @@ export default function Home({ data }) {
 
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(file));
+    setAnalysisFile(file);
     setAnalysis(null);
     setSelectedPetId("");
+    setSiglipComparison(null);
+    setRetrievalComparison(null);
+    setAdvancedError("");
     setAnalysisError("");
     setIsAnalyzing(true);
     drawer.onOpen();
@@ -150,6 +165,34 @@ export default function Home({ data }) {
     setSpeciesFilter("all");
     setActiveQuery("");
     setQuery("");
+  };
+
+  const handleSiglipCompare = async () => {
+    if (!analysisFile || isSiglipComparing) return;
+    setIsSiglipComparing(true);
+    setAdvancedError("");
+    try {
+      const result = await compareSiglip2OpenSet(analysisFile, 5);
+      setSiglipComparison(result);
+    } catch (error) {
+      setAdvancedError(error.message || tr("SigLIP2 비교를 실행할 수 없습니다.", "SigLIP2 comparison is unavailable."));
+    } finally {
+      setIsSiglipComparing(false);
+    }
+  };
+
+  const handleRetrievalCompare = async () => {
+    if (!analysisFile || isRetrievalComparing) return;
+    setIsRetrievalComparing(true);
+    setAdvancedError("");
+    try {
+      const result = await compareRetrievalModels(analysisFile, 6);
+      setRetrievalComparison(result);
+    } catch (error) {
+      setAdvancedError(error.message || tr("검색 모델 비교를 실행할 수 없습니다.", "Retrieval comparison is unavailable."));
+    } finally {
+      setIsRetrievalComparing(false);
+    }
   };
 
   const galleryMeta = {
@@ -496,6 +539,13 @@ export default function Home({ data }) {
         previewUrl={previewUrl}
         analysis={analysis}
         analysisError={analysisError}
+        siglipComparison={siglipComparison}
+        retrievalComparison={retrievalComparison}
+        advancedError={advancedError}
+        isSiglipComparing={isSiglipComparing}
+        isRetrievalComparing={isRetrievalComparing}
+        onSiglipCompare={handleSiglipCompare}
+        onRetrievalCompare={handleRetrievalCompare}
         tr={tr}
       />
     </Box>

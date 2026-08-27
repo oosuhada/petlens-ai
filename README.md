@@ -1,0 +1,277 @@
+# PetLens
+
+**ViT fine-tuning + CLIP semantic retrieval을 실제 웹 서비스 흐름으로 연결한 멀티모달 개인 프로젝트**
+
+GitHub: https://github.com/oosuhada/petlens-ai
+
+Live demo: **[petlens.oosu.dev](https://petlens.oosu.dev/)** · [시작하기](https://petlens.oosu.dev/onboarding) · [사용 가이드](https://petlens.oosu.dev/guide) · [Newfoundland 상세](https://petlens.oosu.dev/photos/newfoundland)
+
+PetLens는 「생성형 AI 기반 멀티모달 AI 서비스 개발 과정」에서 진행한 이미지 분류·멀티모달 검색 실습을 Colab 노트북 결과로 끝내지 않고, 브라우저에서 직접 사용할 수 있는 작은 웹 서비스로 연결한 프로젝트입니다.
+
+- **ViT**: Oxford-IIIT Pet 37개 품종 분류, Top-5 prediction
+- **CLIP**: 자연어 → 이미지 검색, 이미지 → 유사 이미지 검색
+- **Web**: Next.js + Chakra UI
+- **ML serving**: FastAPI + PyTorch + Hugging Face Transformers
+
+> UI는 사진 탐색에 집중한 기존 갤러리의 색상, 카드 비율, 검색바, 상세 페이지 흐름을 유지하고 Pexels 기능을 Oxford-IIIT Pet + ViT/CLIP 기능으로 교체했습니다.
+
+---
+
+## Web demo
+
+### 1. 37개 품종 갤러리
+
+Oxford-IIIT Pet의 37개 클래스가 웹 갤러리의 탐색 단위가 됩니다.
+
+<img src="docs/screenshots/web-01-home-gallery.png" alt="PetLens home gallery" width="900" />
+
+### 2. CLIP 자연어 이미지 검색
+
+영문 자연어를 CLIP text embedding으로 변환하고, 37개 reference image embedding과 cosine similarity로 비교해 결과를 재정렬합니다.
+
+예시 query: `a small white fluffy dog`
+
+실제 smoke-test 결과 상위 항목은 Samoyed → Havanese → Great Pyrenees 순으로 검색되었습니다.
+
+<img src="docs/screenshots/web-02-clip-text-search.png" alt="PetLens CLIP text search" width="900" />
+
+### 3. 사진 업로드 → ViT 품종 분석 + CLIP 유사 이미지
+
+사용자가 사진을 업로드하면 동일 이미지가 두 경로로 처리됩니다.
+
+1. ViT classifier → 37개 품종 중 Top-5 확률
+2. CLIP image encoder → gallery에서 의미적으로 유사한 이미지 검색
+
+Oxford-IIIT Pet의 Newfoundland 샘플을 넣은 실제 로컬 검증에서는 Newfoundland가 1위로 분류되었습니다.
+
+<img src="docs/screenshots/web-03-vit-upload-analysis.png" alt="PetLens ViT upload analysis" width="900" />
+
+### 4. 품종 상세 화면
+
+기존 사진 갤러리의 detail-page 문법을 유지하고, 해당 품종이 학습 데이터의 37개 클래스 중 하나임을 연결했습니다.
+
+<img src="docs/screenshots/web-04-breed-detail.png" alt="PetLens breed detail" width="900" />
+
+---
+
+## From notebook to service
+
+이 프로젝트의 핵심은 웹 UI 자체보다 **실제 학습·평가한 모델 작업을 서비스 인터랙션으로 연결한 과정**입니다.
+
+### ViT fine-tuning — Oxford-IIIT Pet
+
+`google/vit-base-patch16-224`를 37개 반려동물 품종으로 fine-tuning했습니다.
+
+| Metric | Result |
+| --- | ---: |
+| Accuracy | **0.91415** |
+| Macro Precision | **0.91542** |
+| Macro Recall | **0.91362** |
+| Macro F1 | **0.91316** |
+
+#### Colab T4 학습 환경
+
+<img src="docs/screenshots/colab-01-vit-t4-runtime.png" alt="ViT T4 runtime" width="900" />
+
+#### 평가 및 혼동 품종 분석
+
+<img src="docs/screenshots/colab-02-vit-metrics.png" alt="ViT metrics and confusion analysis" width="900" />
+
+#### 실제 이미지 Top-5 inference
+
+<img src="docs/screenshots/colab-03-vit-inference.png" alt="ViT inference" width="900" />
+
+### CLIP retrieval — Flickr30k
+
+`openai/clip-vit-large-patch14`의 image/text embedding을 사용해 Flickr30k 1,000장에 대한 retrieval을 평가했습니다.
+
+| Metric | Result |
+| --- | ---: |
+| Recall@1 | **0.7220** |
+| Recall@5 | **0.9200** |
+| Recall@10 | **0.9530** |
+
+#### Retrieval 평가
+
+<img src="docs/screenshots/colab-04-clip-recall.png" alt="CLIP Recall at K" width="900" />
+
+#### Text → Image 검색
+
+<img src="docs/screenshots/colab-05-clip-text-search.png" alt="CLIP text to image" width="900" />
+
+---
+
+## Additional NLP experiment
+
+이미지 프로젝트와 별도로 KLUE-NLI도 진행했습니다. BERT에서 단순 하이퍼파라미터 변경만 반복하기보다 backbone과 학습 데이터의 영향을 비교했습니다.
+
+| Experiment | Accuracy | Macro F1 |
+| --- | ---: | ---: |
+| BERT baseline | 0.8017 | - |
+| BERT tuned best | 0.8080 | 0.8076 |
+| RoBERTa-base | 0.8343 | 0.8340 |
+| RoBERTa-large | 0.8510 | 0.8513 |
+| **RoBERTa-large + KorNLI** | **0.8647** | **0.8647** |
+
+최종 확장 실험은 KLUE validation 3,000건을 평가 전용으로 유지하고, KorNLI human-translated 6,520건만 train 쪽에 추가했습니다.
+
+<img src="docs/screenshots/colab-06-roberta-kornli-result.png" alt="RoBERTa large plus KorNLI" width="900" />
+
+---
+
+## Architecture
+
+```text
+Browser / Next.js + Chakra UI
+        │
+        ├── text query ───────────────┐
+        │                              ▼
+        │                    CLIP text encoder
+        │                              │
+        │                              ▼
+        │                 normalized gallery embeddings
+        │                              │
+        │                              ▼
+        │                       ranked pet images
+        │
+        └── uploaded image ────────────┬─────────────────────┐
+                                      │                     │
+                                      ▼                     ▼
+                           ViT image classifier       CLIP image encoder
+                                      │                     │
+                                      ▼                     ▼
+                            Top-5 breed scores       similar pet images
+
+                         FastAPI ML adapter
+                                │
+                         PyTorch / Transformers
+```
+
+프론트엔드와 모델 런타임은 분리했습니다. 모델 checkpoint를 교체해도 UI 코드를 다시 작성하지 않아도 됩니다.
+
+---
+
+## Implementation
+
+### Existing UI를 유지한 이유
+
+처음부터 새로운 AI 서비스 UI를 만들기보다, 사진 탐색 서비스로 이미 완성된 디자인 문법을 가진 `next-image-gallery`를 기반으로 삼았습니다.
+
+유지한 요소:
+
+- lavender background
+- centered / underlined title
+- ghost search field + pink search action
+- rounded photo card와 hover elevation
+- gray detail page + pill-shaped home action
+
+교체·추가한 요소:
+
+- Pexels API → Oxford-IIIT Pet 37-class catalog
+- keyword/API search → CLIP semantic retrieval
+- image upload → ViT Top-5 classification
+- image upload → CLIP image-to-image retrieval
+- FastAPI ML adapter
+- 모델 실험 결과와 서비스 runtime 분리
+
+### Reference image catalog
+
+웹 데모에는 각 클래스당 1장의 representative image를 사용합니다. 이미지는 repository에 복제하지 않고 공개 연구 mirror `guebin/oxford-pets-cascam`의 `original/` 경로를 참조합니다.
+
+---
+
+## Runtime and checkpoint note
+
+### ViT
+
+과제에서 직접 학습한 ViT run은 Colab에서 **Accuracy 91.41% / Macro F1 91.32%**를 기록했습니다. 해당 실행 notebook은 별도 제출물로 보존되어 있습니다.
+
+Colab runtime을 삭제한 뒤 local machine에는 그 checkpoint weight 자체가 남아 있지 않았기 때문에, 웹 runtime은 다음 순서로 모델을 선택합니다.
+
+1. `PETLENS_VIT_MODEL`이 지정되어 있으면 해당 checkpoint 사용
+2. 지정되지 않으면 동일한 `google/vit-base-patch16-224` + Oxford-IIIT Pet 37-class 구조의 공개 checkpoint `rakib730/vit-base-oxford-iiit-pets`를 runtime fallback으로 사용
+
+웹 smoke test에서 fallback 결과를 과제의 91.41% 성능이라고 주장하지 않습니다. 과제 성능 근거는 위 Colab 실행 결과입니다.
+
+### CLIP
+
+기본 runtime은 과제 20.3과 같은 `openai/clip-vit-large-patch14`입니다.
+
+README의 웹 기능 캡처는 로컬 기능 검증 시간을 줄이기 위해 `PETLENS_CLIP_MODEL=openai/clip-vit-base-patch32`로 동일 retrieval pipeline을 smoke-test했습니다. 과제의 Recall@K 수치는 별도의 Colab `clip-vit-large-patch14` 실행 결과입니다.
+
+---
+
+## API
+
+FastAPI adapter의 주요 endpoint:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | device / model / gallery index 상태 |
+| `POST /classify` | 이미지 → ViT Top-5 품종 |
+| `POST /search/text` | 자연어 → CLIP gallery ranking |
+| `POST /search/image` | 이미지 → CLIP gallery ranking |
+
+Gallery embedding은 첫 검색 시 생성하고 process memory에 cache합니다.
+
+---
+
+## Run locally
+
+```bash
+npm ci
+python3 -m venv .venv
+.venv/bin/pip install -r ml_service/requirements.txt
+```
+
+직접 학습한 ViT checkpoint가 있다면:
+
+```bash
+export PETLENS_VIT_MODEL=/absolute/path/to/results/vit-pet/best
+```
+
+두 서비스를 함께 시작합니다.
+
+```bash
+chmod +x run_local.sh
+./run_local.sh
+```
+
+브라우저에서 `http://127.0.0.1:3000`을 엽니다.
+
+> 현재 Node/OpenSSL 조합에서 production build 시 `NODE_OPTIONS=--openssl-legacy-provider`를 사용합니다. UI의 원형을 유지하기 위해 과제 범위에서 프레임워크 자체를 대규모 마이그레이션하지 않았습니다.
+
+---
+
+## Repository structure
+
+```text
+petlens-ai/
+├── data/pets.json             # 37-class web catalog
+├── docs/screenshots/          # Colab evidence + real web captures
+├── lib/
+│   ├── api.js                 # browser ↔ FastAPI client
+│   └── catalog.js             # gallery mapping
+├── ml_service/
+│   ├── app.py                 # ViT + CLIP FastAPI adapter
+│   └── requirements.txt
+├── pages/
+│   ├── index.js               # gallery / search / upload analysis
+│   └── photos/[id].js         # breed detail
+├── run_local.sh
+└── README.md
+```
+
+---
+
+## Coursework submission
+
+최종 제출본에는 이 웹 프로젝트와 함께 다음 실행 notebook을 보존했습니다.
+
+- `20.1_BERT_NLI_FINAL.ipynb`
+- `20.2_ViT_Pet_FINAL.ipynb`
+- `20.3_CLIP_ImageSearch_FINAL.ipynb`
+- `20.1_NLI_RoBERTaLarge_KorNLI_BEST.ipynb`
+- `20.1_NLI_Extension_Comparison.ipynb`
+
+---

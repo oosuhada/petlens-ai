@@ -301,12 +301,11 @@ export default function Home({ data }) {
                 align="center"
                 direction="row"
                 wrap="wrap"
-                columnGap={["4", "8", "12"]}
-                rowGap="3"
               >
                 <Button
                   h="50px"
                   px="6"
+                  mr={[4, 8, 12]}
                   borderRadius="10px"
                   bg={dark ? "white" : "#241c2c"}
                   color={dark ? "#241c2c" : "white"}
@@ -319,7 +318,6 @@ export default function Home({ data }) {
                   color={dark ? "whiteAlpha.400" : "gray.400"}
                   fontSize="xs"
                   lineHeight="1.5"
-                  ml={[0, 1, 2]}
                 >
                   JPG, PNG, WebP · {tr("최대 12MB", "up to 12 MB")}
                 </Text>
@@ -332,7 +330,6 @@ export default function Home({ data }) {
           align={["flex-start", "center"]}
           justify="space-between"
           direction={["column", "row"]}
-          gap="3"
           px={[1, 1, 2]}
           mb={[4, 5]}
         >
@@ -340,8 +337,8 @@ export default function Home({ data }) {
             <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.15em">
               {galleryMeta.eyebrow}
             </Text>
-            <Flex align="baseline" gap="3" mt="1.5" wrap="wrap">
-              <Text fontSize={["xl", "2xl"]} fontWeight="800" letterSpacing="-0.035em">
+            <Flex align="baseline" mt="1.5" wrap="wrap">
+              <Text mr="3" fontSize={["xl", "2xl"]} fontWeight="800" letterSpacing="-0.035em">
                 {galleryMeta.title}
               </Text>
               {galleryMeta.subtitle && (
@@ -352,7 +349,7 @@ export default function Home({ data }) {
             </Flex>
           </Box>
 
-          <Flex align="center" gap="2" flexShrink="0" wrap="wrap" justify="flex-end">
+          <Flex align="center" flexShrink="0" wrap="wrap" justify="flex-end" mt={[3, 0]}>
             {mode === "all" ? (
               <Text color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="sm" textAlign="right">
                 {tr("Oxford-IIIT Pet의 전체 레퍼런스", "Complete Oxford-IIIT Pet reference set")}
@@ -363,14 +360,14 @@ export default function Home({ data }) {
               </Text>
             )}
             {mode !== "all" && (
-              <Button size="xs" variant="ghost" borderRadius="8px" color="pink.500" onClick={resetGallery}>
+              <Button ml="2" size="xs" variant="ghost" borderRadius="8px" color="pink.500" onClick={resetGallery}>
                 {tr("전체 보기", "All breeds")}
               </Button>
             )}
           </Flex>
         </Flex>
 
-        <Flex px={[1, 1, 2]} mb={[4, 5]} gap="2" wrap="wrap">
+        <Flex px={[1, 1, 2]} mb={[4, 5]} wrap="wrap">
           {[
             ["all", tr("전체", "All")],
             ["dog", tr("강아지", "Dogs")],
@@ -383,6 +380,8 @@ export default function Home({ data }) {
                 size="sm"
                 borderRadius="full"
                 px="4"
+                mr="2"
+                mb="2"
                 variant={active ? "solid" : "outline"}
                 bg={active ? (dark ? "white" : "#241c2c") : "transparent"}
                 color={active ? (dark ? "#241c2c" : "white") : (dark ? "whiteAlpha.700" : "gray.600")}
@@ -436,15 +435,14 @@ export default function Home({ data }) {
           justify="space-between"
           align={["flex-start", "center"]}
           direction={["column", "row"]}
-          gap="3"
           px={[1, 1, 2]}
         >
           <Text color={dark ? "whiteAlpha.400" : "gray.500"} fontSize="xs">
             {tr("Oxford-IIIT Pet · ViT 분류 · CLIP 검색", "Oxford-IIIT Pet · ViT classification · CLIP retrieval")}
           </Text>
-          <Flex gap="4" fontSize="xs">
+          <Flex mt={[3, 0]} fontSize="xs">
             <Link href="/onboarding" passHref><Text as="a" color={dark ? "whiteAlpha.600" : "gray.500"}>{tr("시작하기", "Onboarding")}</Text></Link>
-            <Link href="/guide" passHref><Text as="a" color={dark ? "whiteAlpha.600" : "gray.500"}>{tr("결과 읽는 법", "Guide")}</Text></Link>
+            <Link href="/guide" passHref><Text as="a" ml="4" color={dark ? "whiteAlpha.600" : "gray.500"}>{tr("결과 읽는 법", "Guide")}</Text></Link>
           </Flex>
         </Flex>
       </Box>

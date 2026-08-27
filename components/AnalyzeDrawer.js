@@ -110,22 +110,22 @@ export default function AnalyzeDrawer({
 
               {analysis && (
                 <Box>
-                  <Flex align="end" justify="space-between" mb="5" gap="4">
+                  <Flex align="end" justify="space-between" mb="5">
                     <Box minW="0">
                       <Text color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="10px" fontWeight="800" letterSpacing="0.12em">
                         {tr("가장 높은 예측", "TOP PREDICTION")}
                       </Text>
                       <Text fontSize="2xl" fontWeight="800" mt="1" textTransform="capitalize" noOfLines={1}>{topPrediction?.label}</Text>
                     </Box>
-                    <Text color="pink.500" fontSize="2xl" fontWeight="800">{(topPrediction?.confidence * 100).toFixed(1)}%</Text>
+                    <Text ml="4" color="pink.500" fontSize="2xl" fontWeight="800">{(topPrediction?.confidence * 100).toFixed(1)}%</Text>
                   </Flex>
 
                   <Stack spacing="3.5">
                     {analysis.predictions.map((prediction, index) => (
                       <Box key={`${prediction.label}-${index}`}>
-                        <Flex align="baseline" mb="1.5" gap="3">
+                        <Flex align="baseline" mb="1.5">
                           <Text flex="1" minW="0" fontSize="sm" fontWeight={index === 0 ? "700" : "500"} textTransform="capitalize" noOfLines={1}>{prediction.label}</Text>
-                          <Text fontSize="xs" color={dark ? "whiteAlpha.500" : "gray.500"}>{(prediction.confidence * 100).toFixed(1)}%</Text>
+                          <Text ml="3" fontSize="xs" color={dark ? "whiteAlpha.500" : "gray.500"}>{(prediction.confidence * 100).toFixed(1)}%</Text>
                         </Flex>
                         <Progress value={prediction.confidence * 100} size="xs" colorScheme={index === 0 ? "pink" : "purple"} borderRadius="full" bg={dark ? "whiteAlpha.100" : "blackAlpha.100"} />
                       </Box>

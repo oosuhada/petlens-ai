@@ -43,12 +43,11 @@ export default function ExplorerHeader({
         px={[3, 4, 6]}
         h={["64px", "68px"]}
         align="center"
-        gap={[2, 3, 5]}
       >
         <BrandMark dark={dark} compact />
         <Box flex="1" />
 
-        <Flex align="center" gap="1" flexShrink="0">
+        <Flex align="center" flexShrink="0">
           <Button
             as="a"
             href="#explore-tools"
@@ -63,6 +62,7 @@ export default function ExplorerHeader({
           <Link href="/guide" passHref>
             <Button
               as="a"
+              ml="1"
               display={["none", "none", "inline-flex"]}
               size="sm"
               variant="ghost"
@@ -119,6 +119,7 @@ export default function ExplorerHeader({
           <IconButton
             aria-label={tr("모바일 메뉴 열기", "Open mobile menu")}
             icon={<HamburgerIcon />}
+            ml="1"
             display={["inline-flex", "inline-flex", "none"]}
             size="sm"
             variant="ghost"
@@ -144,7 +145,7 @@ export default function ExplorerHeader({
             PetLens
           </DrawerHeader>
           <DrawerBody pt="5" pb="8">
-            <Flex direction="column" gap="2">
+            <Flex direction="column">
               <Button
                 as="a"
                 href="#explore-tools"
@@ -157,6 +158,7 @@ export default function ExplorerHeader({
               <Link href="/guide" passHref>
                 <Button
                   as="a"
+                  mt="2"
                   justifyContent="flex-start"
                   variant="ghost"
                   onClick={mobileMenu.onClose}
@@ -167,6 +169,7 @@ export default function ExplorerHeader({
               <Link href="/onboarding" passHref>
                 <Button
                   as="a"
+                  mt="2"
                   justifyContent="flex-start"
                   variant="ghost"
                   onClick={mobileMenu.onClose}

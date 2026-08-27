@@ -38,13 +38,13 @@ export default function PhotoTile({ photo, index, ranked = false, reducedMotion 
             pb="3"
             bg="linear-gradient(to top, rgba(8,6,10,0.82), rgba(8,6,10,0.34), transparent)"
           >
-            <Flex align="flex-end" gap="2">
+            <Flex align="flex-end">
               <Box minW="0" flex="1">
                 <Text fontWeight="700" fontSize="sm" lineHeight="1.2" noOfLines={1}>{photo.breed}</Text>
                 <Text fontSize="10px" color="whiteAlpha.700" mt="1" letterSpacing="0.08em">{photo.species.toUpperCase()}</Text>
               </Box>
               {typeof photo.score === "number" && (
-                <Text fontSize="xs" fontWeight="700" color="pink.200">{photo.score.toFixed(3)}</Text>
+                <Text ml="2" fontSize="xs" fontWeight="700" color="pink.200">{photo.score.toFixed(3)}</Text>
               )}
             </Flex>
           </Box>

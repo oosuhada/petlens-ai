@@ -83,7 +83,7 @@ export default function Guide() {
     <Box minH="100vh" bg={dark ? "#0f0c12" : "#fbfafc"} color={dark ? "white" : "gray.800"}>
       <Head><title>{tr("결과 읽는 법", "Guide")} · PetLens</title></Head>
 
-      <Flex h="68px" px={[3, 6, 8]} align="center" gap="1" borderBottom="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
+      <Flex h="68px" px={[3, 6, 8]} align="center" borderBottom="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
         <BrandMark dark={dark} compact />
         <Box flex="1" />
         <Link href="/" passHref>

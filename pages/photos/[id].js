@@ -48,8 +48,8 @@ export default function PhotoDetail({ pic }) {
         </Link>
         <BrandMark dark={dark} compact />
         <Box flex="1" />
-        <Flex align="center" gap="1">
-          <Button size="xs" variant="ghost" onClick={() => changeLanguage(isKo ? "en" : "ko")}>{isKo ? "EN" : "한"}</Button>
+        <Flex align="center">
+          <Button mr="1" size="xs" variant="ghost" onClick={() => changeLanguage(isKo ? "en" : "ko")}>{isKo ? "EN" : "한"}</Button>
           <IconButton aria-label={dark ? "라이트 모드" : "다크 모드"} icon={dark ? <SunIcon /> : <MoonIcon />} size="sm" variant="ghost" onClick={toggleColorMode} />
         </Flex>
       </Flex>
@@ -152,9 +152,9 @@ export default function PhotoDetail({ pic }) {
 
 function InfoRow({ label, value, dark }) {
   return (
-    <Flex py={[4, 5]} borderBottom="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"} align="baseline" gap="5">
+    <Flex py={[4, 5]} borderBottom="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"} align="baseline">
       <Text flex="1" color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="xs">{label}</Text>
-      <Text fontSize="sm" fontWeight="700">{value}</Text>
+      <Text ml="5" fontSize="sm" fontWeight="700">{value}</Text>
     </Flex>
   );
 }

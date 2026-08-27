@@ -47,7 +47,6 @@ export default function Onboarding() {
         h="68px"
         px={[3, 6, 8]}
         align="center"
-        gap="1"
         borderBottom="1px solid"
         borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}
       >
@@ -58,8 +57,8 @@ export default function Onboarding() {
       </Flex>
 
       <Box maxW="1180px" mx="auto" px={[5, 7, 9]} pt={[9, 12, 14]} pb={[12, 14, 16]}>
-        <Flex direction={["column", "column", "row"]} gap={[8, 10, 14]} align="flex-start">
-          <Box width={["100%", "100%", "34%"]} position={["static", "static", "sticky"]} top="94px">
+        <Flex direction={["column", "column", "row"]} align="flex-start">
+          <Box width={["100%", "100%", "34%"]} mb={[8, 10, 0]} mr={[0, 0, 14]} position={["static", "static", "sticky"]} top="94px">
             <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.16em">ONBOARDING</Text>
             <Text fontSize={["3xl", "4xl"]} fontWeight="800" letterSpacing="-0.045em" lineHeight="1.08" mt="3">
               <Box as="span" display="block" whiteSpace="nowrap">{tr("세 단계면", "Three steps,")}</Box>
@@ -75,7 +74,7 @@ export default function Onboarding() {
             </Link>
           </Box>
 
-          <Grid width={["100%", "100%", "66%"]} gap="0" borderTop="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
+          <Grid width={["100%", "100%", "auto"]} flex="1" minW="0" gap="0" borderTop="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
             {steps.map((step) => (
               <Grid
                 key={step.no}

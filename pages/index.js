@@ -1,0 +1,462 @@
+import React, { useEffect, useMemo, useState } from "react";
+import Head from "next/head";
+import Link from "next/link";
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  Input,
+  Stack,
+  Spinner,
+  Text,
+  useColorMode,
+  useDisclosure,
+  useToast,
+} from "@chakra-ui/react";
+import { ArrowForwardIcon, SearchIcon } from "@chakra-ui/icons";
+
+import AnalyzeDrawer from "../components/AnalyzeDrawer";
+import ExplorerHeader from "../components/ExplorerHeader";
+import PhotoStage from "../components/PhotoStage";
+import PhotoTile from "../components/PhotoTile";
+import usePetLensLocale from "../hooks/usePetLensLocale";
+import useReducedMotionPreference from "../hooks/useReducedMotionPreference";
+import {
+  classifyPet,
+  getCuratedPhotos,
+  getImageMatches,
+  getQueryPhotos,
+} from "../lib/api";
+
+export default function Home({ data }) {
+  const { isKo, tr, changeLanguage } = usePetLensLocale();
+  const { colorMode } = useColorMode();
+  const dark = colorMode === "dark";
+  const reducedMotion = useReducedMotionPreference();
+  const drawer = useDisclosure();
+  const toast = useToast();
+
+  const [photos, setPhotos] = useState(data);
+  const [query, setQuery] = useState("");
+  const [activeQuery, setActiveQuery] = useState("");
+  const [mode, setMode] = useState("all");
+  const [speciesFilter, setSpeciesFilter] = useState("all");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisError, setAnalysisError] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const featured = useMemo(
+    () => ["samoyed", "newfoundland", "ragdoll"].map((id) => data.find((photo) => photo.id === id)).filter(Boolean),
+    [data]
+  );
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  const resetGallery = () => {
+    setPhotos(data);
+    setQuery("");
+    setActiveQuery("");
+    setMode("all");
+    setSpeciesFilter("all");
+    setSearchError("");
+  };
+
+  const handleSearch = async (event) => {
+    event.preventDefault();
+    const nextQuery = query.trim();
+    if (!nextQuery) {
+      toast({
+        title: tr("검색어를 입력해주세요.", "Enter a search description."),
+        description: tr("영어 자연어 검색이 가장 안정적입니다.", "English natural-language queries work best."),
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+        position: "top",
+      });
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchError("");
+    try {
+      const result = await getQueryPhotos(nextQuery);
+      setPhotos(result);
+      setActiveQuery(nextQuery);
+      setMode("search");
+    } catch (error) {
+      setSearchError(error.message || tr("검색을 사용할 수 없습니다.", "Semantic search is unavailable."));
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setAnalysisError(tr("이미지 파일을 선택해주세요.", "Please choose an image file."));
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      setAnalysisError(tr("12MB 이하 이미지를 선택해주세요.", "Please choose an image under 12 MB."));
+      event.target.value = "";
+      return;
+    }
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(URL.createObjectURL(file));
+    setAnalysis(null);
+    setAnalysisError("");
+    setIsAnalyzing(true);
+    drawer.onOpen();
+
+    try {
+      const [classification, matches] = await Promise.all([
+        classifyPet(file),
+        getImageMatches(file, 16),
+      ]);
+      setAnalysis(classification);
+      setPhotos(matches);
+      setMode("similar");
+      setActiveQuery("");
+      setQuery("");
+    } catch (error) {
+      setAnalysisError(error.message || tr("이미지 분석을 사용할 수 없습니다.", "Image analysis is unavailable."));
+    } finally {
+      setIsAnalyzing(false);
+      event.target.value = "";
+    }
+  };
+
+  const galleryMeta = {
+    all: {
+      eyebrow: tr("전체 라이브러리", "LIBRARY"),
+      title: tr("37개 품종", "37 breeds"),
+      subtitle: "",
+    },
+    search: {
+      eyebrow: "CLIP · TEXT → IMAGE",
+      title: tr("의미 검색 결과", "Semantic search"),
+      subtitle: activeQuery ? `“${activeQuery}”` : "",
+    },
+    similar: {
+      eyebrow: "CLIP · IMAGE → IMAGE",
+      title: tr("업로드 사진과 닮은 순서", "Similar to your upload"),
+      subtitle: analysis?.predictions?.[0]
+        ? tr(`ViT 1순위 · ${analysis.predictions[0].label}`, `ViT top-1 · ${analysis.predictions[0].label}`)
+        : tr("이미지 임베딩 유사도 순위", "Ranked by image-embedding similarity"),
+    },
+  }[mode];
+
+  const visiblePhotos = photos.filter((photo) =>
+    speciesFilter === "all" ? true : photo.species === speciesFilter
+  );
+
+  return (
+    <Box minH="100vh" bg={dark ? "#0f0c12" : "#fbfafc"} color={dark ? "white" : "gray.800"} overflowX="hidden">
+      <Head>
+        <title>PetLens — Visual Pet Explorer</title>
+        <meta name="description" content="Explore Oxford-IIIT Pet with ViT breed analysis and CLIP semantic retrieval." />
+      </Head>
+
+      <ExplorerHeader
+        isKo={isKo}
+        changeLanguage={changeLanguage}
+        tr={tr}
+      />
+
+      <PhotoStage featured={featured} tr={tr} />
+
+      <Box as="main" maxW="1540px" mx="auto" px={[2, 3, 5]} pt={[4, 5, 6]} pb={[20, 18]}>
+        <Box id="explore-tools" px={[1, 1, 2]} mb={[7, 8, 10]}>
+          <Flex
+            direction="column"
+            align="stretch"
+            gap={[4, 5, 6]}
+          >
+            <Box
+              flex="1"
+              bg={dark ? "#17131d" : "white"}
+              border="1px solid"
+              borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"}
+              borderRadius={["16px", "18px"]}
+              p={[5, 6, 7]}
+              boxShadow={dark ? "0 18px 38px rgba(0,0,0,0.20)" : "0 18px 42px rgba(59,37,70,0.07)"}
+            >
+              <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.16em">
+                CLIP · {tr("의미 기반 검색", "SEMANTIC SEARCH")}
+              </Text>
+              <Heading
+                as="h2"
+                mt="3"
+                fontSize={["2xl", "3xl"]}
+                lineHeight="1.16"
+                letterSpacing="-0.04em"
+              >
+                {isKo ? (
+                  <>
+                    <Box as="span" display="block" whiteSpace="nowrap">문장으로 찾고,</Box>
+                    <Box as="span" display="block" whiteSpace="nowrap">사진으로 이어가세요.</Box>
+                  </>
+                ) : (
+                  <>
+                    <Box as="span" display="block">Search by sentence.</Box>
+                    <Box as="span" display="block">Continue with images.</Box>
+                  </>
+                )}
+              </Heading>
+              <Text color={dark ? "whiteAlpha.700" : "gray.600"} mt="4" fontSize="sm" lineHeight="1.75" maxW="640px">
+                {tr(
+                  "원하는 장면을 문장으로 설명하면 CLIP이 37개 레퍼런스를 의미적으로 다시 정렬합니다. 현재는 영어 자연어 검색에서 가장 안정적으로 동작합니다.",
+                  "Describe the scene you want and CLIP re-ranks all 37 references by semantic similarity. English queries are the most stable in this demo."
+                )}
+              </Text>
+              <form onSubmit={handleSearch}>
+                <Stack direction={["column", "row"]} spacing="3" mt="5">
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    h="50px"
+                    borderRadius="10px"
+                    bg={dark ? "whiteAlpha.100" : "#fbfafc"}
+                    borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"}
+                    placeholder={tr("예: a small white fluffy dog", "Try: a small white fluffy dog")}
+                    _placeholder={{ color: dark ? "whiteAlpha.400" : "gray.400" }}
+                    _focus={{ borderColor: "pink.400", boxShadow: "0 0 0 1px #ed64a6" }}
+                  />
+                  <Button
+                    type="submit"
+                    leftIcon={<SearchIcon />}
+                    h="50px"
+                    px="6"
+                    borderRadius="10px"
+                    bg="pink.500"
+                    color="white"
+                    isLoading={isSearching}
+                    loadingText={tr("검색 중", "Searching")}
+                    flexShrink="0"
+                    _hover={{ bg: "pink.600" }}
+                  >
+                    {tr("검색", "Search")}
+                  </Button>
+                </Stack>
+              </form>
+              {searchError && (
+                <Text mt="3" fontSize="sm" color={dark ? "red.200" : "red.600"}>
+                  {searchError}
+                </Text>
+              )}
+            </Box>
+
+            <Box
+              flex="1"
+              bg={dark ? "#17131d" : "white"}
+              border="1px solid"
+              borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"}
+              borderRadius={["16px", "18px"]}
+              p={[5, 6, 7]}
+              boxShadow={dark ? "0 18px 38px rgba(0,0,0,0.20)" : "0 18px 42px rgba(59,37,70,0.07)"}
+            >
+              <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.16em">
+                VIT · {tr("품종 분석", "BREED ANALYSIS")}
+              </Text>
+              <Heading
+                as="h2"
+                mt="3"
+                fontSize={["2xl", "3xl"]}
+                lineHeight="1.16"
+                letterSpacing="-0.04em"
+              >
+                {tr("반려동물 사진 분석", "Analyze a pet photo")}
+              </Heading>
+              <Text color={dark ? "whiteAlpha.700" : "gray.600"} mt="4" fontSize="sm" lineHeight="1.75" maxW="640px">
+                {tr(
+                  "고양이 또는 강아지가 잘 보이는 사진 한 장을 올려보세요. ViT가 상위 5개 품종 확률을, CLIP이 이미지 유사도 기반 레퍼런스 순위를 반환합니다.",
+                  "Upload one clear cat or dog photo. ViT returns the top five breed probabilities while CLIP re-ranks the gallery by image similarity."
+                )}
+              </Text>
+              <Flex mt="5" align="center" wrap="wrap" gap="3">
+                <Button
+                  h="50px"
+                  px="6"
+                  borderRadius="10px"
+                  bg={dark ? "white" : "#241c2c"}
+                  color={dark ? "#241c2c" : "white"}
+                  onClick={drawer.onOpen}
+                  _hover={{ opacity: 0.9 }}
+                >
+                  {analysis ? tr("분석 결과 보기", "View analysis") : tr("사진 선택", "Choose a photo")}
+                </Button>
+                <Text color={dark ? "whiteAlpha.400" : "gray.400"} fontSize="xs">
+                  JPG, PNG, WebP · {tr("최대 12MB", "up to 12 MB")}
+                </Text>
+              </Flex>
+            </Box>
+          </Flex>
+        </Box>
+
+        <Flex
+          align={["flex-start", "center"]}
+          justify="space-between"
+          direction={["column", "row"]}
+          gap="3"
+          px={[1, 1, 2]}
+          mb={[4, 5]}
+        >
+          <Box minW="0">
+            <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.15em">
+              {galleryMeta.eyebrow}
+            </Text>
+            <Flex align="baseline" gap="3" mt="1.5" wrap="wrap">
+              <Text fontSize={["xl", "2xl"]} fontWeight="800" letterSpacing="-0.035em">
+                {galleryMeta.title}
+              </Text>
+              {galleryMeta.subtitle && (
+                <Text color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="sm" maxW="680px" noOfLines={1}>
+                  {galleryMeta.subtitle}
+                </Text>
+              )}
+            </Flex>
+          </Box>
+
+          <Flex align="center" gap="2" flexShrink="0" wrap="wrap" justify="flex-end">
+            {mode === "all" ? (
+              <Text color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="sm" textAlign="right">
+                {tr("Oxford-IIIT Pet의 전체 레퍼런스", "Complete Oxford-IIIT Pet reference set")}
+              </Text>
+            ) : (
+              <Text color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="xs">
+                {tr(`${visiblePhotos.length}개 결과`, `${visiblePhotos.length} results`)}
+              </Text>
+            )}
+            {mode !== "all" && (
+              <Button size="xs" variant="ghost" borderRadius="8px" color="pink.500" onClick={resetGallery}>
+                {tr("전체 보기", "All breeds")}
+              </Button>
+            )}
+          </Flex>
+        </Flex>
+
+        <Flex px={[1, 1, 2]} mb={[4, 5]} gap="2" wrap="wrap">
+          {[
+            ["all", tr("전체", "All")],
+            ["dog", tr("강아지", "Dogs")],
+            ["cat", tr("고양이", "Cats")],
+          ].map(([value, label]) => {
+            const active = speciesFilter === value;
+            return (
+              <Button
+                key={value}
+                size="sm"
+                borderRadius="full"
+                px="4"
+                variant={active ? "solid" : "outline"}
+                bg={active ? (dark ? "white" : "#241c2c") : "transparent"}
+                color={active ? (dark ? "#241c2c" : "white") : (dark ? "whiteAlpha.700" : "gray.600")}
+                borderColor={dark ? "whiteAlpha.200" : "blackAlpha.200"}
+                _hover={{ bg: active ? undefined : (dark ? "whiteAlpha.100" : "blackAlpha.50") }}
+                onClick={() => setSpeciesFilter(value)}
+              >
+                {label}
+              </Button>
+            );
+          })}
+        </Flex>
+
+        {searchError && (
+          <Box mx={[1, 1, 2]} mb="4" px="4" py="3" borderRadius="10px" bg={dark ? "red.900" : "red.50"} color={dark ? "red.100" : "red.700"} fontSize="sm">
+            {searchError}
+          </Box>
+        )}
+
+        {isSearching ? (
+          <Flex minH="420px" align="center" justify="center" direction="column">
+            <Spinner color="pink.500" thickness="3px" />
+            <Text mt="3" fontSize="sm" color={dark ? "whiteAlpha.500" : "gray.500"}>
+              {tr("CLIP 임베딩으로 사진 순위를 계산하고 있습니다…", "Ranking photos in CLIP embedding space…")}
+            </Text>
+          </Flex>
+        ) : (
+          <Box
+            sx={{
+              columnCount: [2, 3, 4, 5, 6],
+              columnGap: ["8px", "10px", "12px"],
+            }}
+          >
+            {visiblePhotos.map((photo, index) => (
+              <PhotoTile
+                key={photo.id}
+                photo={photo}
+                index={index}
+                ranked={mode !== "all"}
+                reducedMotion={reducedMotion}
+              />
+            ))}
+          </Box>
+        )}
+
+        <Flex
+          mt={[8, 10]}
+          pt="5"
+          borderTop="1px solid"
+          borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}
+          justify="space-between"
+          align={["flex-start", "center"]}
+          direction={["column", "row"]}
+          gap="3"
+          px={[1, 1, 2]}
+        >
+          <Text color={dark ? "whiteAlpha.400" : "gray.500"} fontSize="xs">
+            {tr("Oxford-IIIT Pet · ViT 분류 · CLIP 검색", "Oxford-IIIT Pet · ViT classification · CLIP retrieval")}
+          </Text>
+          <Flex gap="4" fontSize="xs">
+            <Link href="/onboarding" passHref><Text as="a" color={dark ? "whiteAlpha.600" : "gray.500"}>{tr("시작하기", "Onboarding")}</Text></Link>
+            <Link href="/guide" passHref><Text as="a" color={dark ? "whiteAlpha.600" : "gray.500"}>{tr("결과 읽는 법", "Guide")}</Text></Link>
+          </Flex>
+        </Flex>
+      </Box>
+
+      <Button
+        display={["inline-flex", "none"]}
+        position="fixed"
+        right="4"
+        bottom="4"
+        zIndex="30"
+        h="48px"
+        px="4"
+        borderRadius="full"
+        bg="pink.500"
+        color="white"
+        boxShadow="0 12px 30px rgba(190,24,93,0.28)"
+        _hover={{ bg: "pink.600" }}
+        onClick={drawer.onOpen}
+      >
+        {tr("사진 분석", "Analyze")}
+        <ArrowForwardIcon ml="2" />
+      </Button>
+
+      <AnalyzeDrawer
+        isOpen={drawer.isOpen}
+        onClose={drawer.onClose}
+        onFile={handleFile}
+        isAnalyzing={isAnalyzing}
+        previewUrl={previewUrl}
+        analysis={analysis}
+        analysisError={analysisError}
+        tr={tr}
+      />
+    </Box>
+  );
+}
+
+export async function getServerSideProps() {
+  const data = await getCuratedPhotos();
+  return { props: { data } };
+}

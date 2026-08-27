@@ -496,9 +496,3 @@ PetLens의 결과를 해석할 때 다음 제한을 고려해야 합니다.
 - 현재 video analysis는 real-time stream processing이 아니라 sampled-frame batch inference입니다.
 
 PetLens는 의료 진단이나 행동 이상 진단을 위한 시스템이 아니라 **반려동물 visual understanding과 multimodal retrieval을 탐색하기 위한 AI application**입니다.
-
----
-
-## License
-
-Repository code는 `LICENSE` 파일을 따릅니다. 외부 dataset과 pretrained model은 각각의 원 저작자 license와 usage terms를 따릅니다.

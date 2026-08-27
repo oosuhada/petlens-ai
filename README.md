@@ -9,6 +9,7 @@ Live demo: **[petlens.oosu.dev](https://petlens.oosu.dev/)** · [시작하기](h
 PetLens는 「생성형 AI 기반 멀티모달 AI 서비스 개발 과정」에서 진행한 이미지 분류·멀티모달 검색 실습을 Colab 노트북 결과로 끝내지 않고, 브라우저에서 직접 사용할 수 있는 작은 웹 서비스로 연결한 프로젝트입니다.
 
 - **ViT**: Oxford-IIIT Pet 37개 품종 분류, Top-5 prediction
+- **Dog-130 ViT**: Tsinghua Dogs 130개 강아지 품종 분류, production에서 dog detection에 우선 적용
 - **Dog-130 ViT**: Tsinghua Dogs 130개 개 품종 확장 classifier (hierarchical dog branch)
 - **CLIP**: 자연어 → 이미지 검색, 이미지 → 유사 이미지 검색
 - **Grounding DINO**: 복잡한 사진에서 cat / dog 위치 감지, 여러 마리 개별 crop 분석
@@ -19,6 +20,8 @@ PetLens는 「생성형 AI 기반 멀티모달 AI 서비스 개발 과정」에�
 - **ML serving**: FastAPI + PyTorch + Hugging Face Transformers
 
 현재 `main`은 PetLens 2.0 개발선입니다. 기존 37-class 단일 이미지 분석 버전은 `petlens-1.0` 브랜치에 보존했습니다.
+
+현재 production은 hierarchical classifier 구조입니다. Grounding DINO가 `dog`를 감지하면 Colab A100에서 학습한 Dog-130 checkpoint를 사용하고, `cat`은 기존 Oxford-IIIT Pet 37-class classifier를 유지합니다. Dog-130 최종 validation은 Accuracy **0.8679**, Macro F1 **0.8664**이며 model weight는 GitHub에 포함하지 않고 Mac mini의 별도 모델 경로에서 로드합니다.
 
 > UI는 사진 탐색에 집중한 기존 갤러리의 색상, 카드 비율, 검색바, 상세 페이지 흐름을 유지하고 Pexels 기능을 Oxford-IIIT Pet + ViT/CLIP 기능으로 교체했습니다.
 

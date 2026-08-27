@@ -26,8 +26,8 @@ export default function Guide() {
     },
     {
       label: "VIT · TOP-5",
-      title: tr("분류는 37개 클래스 안에서만", "Classification stays inside 37 classes"),
-      body: tr("ViT는 Oxford-IIIT Pet의 37개 품종 중 가장 가능성이 높은 후보를 반환합니다. 데이터셋 밖 품종을 새로 만들어내지 않습니다.", "ViT chooses among the 37 Oxford-IIIT Pet breeds; it does not invent classes outside that label set."),
+      title: tr("강아지 130종 · 고양이 Pet-37", "130 dog breeds · cats stay on Pet-37"),
+      body: tr("PetLens 2.0은 감지 결과가 강아지면 Tsinghua Dogs 기반 Dog-130 모델에서 Top-5를 반환하고, 고양이는 기존 Oxford-IIIT Pet 37-class 모델을 사용합니다. 각 분류기는 자신의 label set 밖 품종을 새로 만들어내지 않습니다.", "PetLens 2.0 routes detected dogs to the Tsinghua Dogs Dog-130 classifier and cats to the existing Oxford-IIIT Pet 37-class model. Each classifier can only choose from its own label set."),
     },
     {
       label: "CLIP · IMAGE → IMAGE",
@@ -62,8 +62,8 @@ export default function Guide() {
       label: "VIT · PHOTO ANALYSIS",
       title: tr("내 사진은 ‘품종 예측’과 ‘유사 이미지 검색’을 함께 보세요", "Read your upload through classification and similarity together"),
       body: tr(
-        "‘품종 분석’ 카드에서 반려동물 사진 한 장을 업로드하면 ViT가 37개 클래스 안에서 Top-5 품종 확률을 반환합니다. 동시에 같은 업로드 이미지를 CLIP으로 임베딩해 갤러리에서 시각적으로 비슷한 레퍼런스를 다시 정렬합니다.",
-        "Upload one pet photo in the Breed Analysis card. ViT returns top-5 probabilities across the 37 classes, while CLIP embeds the same image and re-ranks the gallery by visual similarity."
+        "‘품종 분석’ 카드에서 사진을 업로드하면 먼저 고양이·강아지를 감지합니다. 강아지는 130개 Dog-130 클래스, 고양이는 기존 Pet-37 클래스 안에서 Top-5를 반환하며, 동시에 CLIP은 기존 37개 레퍼런스 갤러리를 시각적 유사도 순으로 다시 정렬합니다.",
+        "Upload a photo in the Breed Analysis card and PetLens first detects cats and dogs. Dogs get top-5 predictions from Dog-130, cats from Pet-37, while CLIP independently re-ranks the existing 37-reference gallery by visual similarity."
       ),
       tip: tr("ViT 1위 품종과 CLIP 유사 이미지 1위가 달라도 정상입니다. 두 모델은 서로 다른 질문에 답합니다.", "It is normal for ViT top-1 and the most similar CLIP image to differ; the two models answer different questions."),
     },

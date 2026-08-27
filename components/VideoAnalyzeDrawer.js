@@ -107,7 +107,7 @@ export default function VideoAnalyzeDrawer({
                         <Box key={track.id} px="4" py="4" border="1px solid" borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"} borderRadius="12px" bg={dark ? "#19151d" : "white"}>
                           <Flex align="baseline">
                             <Text flex="1" minW="0" fontSize="10px" fontWeight="800" color="pink.500" letterSpacing="0.1em">
-                              TRACK {index + 1} · {String(track.species || "pet").toUpperCase()}
+                              TRACK {index + 1} · {String(track.species || "pet").toUpperCase()} · {track.classifier?.scope === "dog130" ? "DOG-130" : "PET-37"}
                             </Text>
                             <Text ml="4" fontSize="10px" color={dark ? "whiteAlpha.500" : "gray.500"}>
                               {(track.timeline || []).length} FRAMES

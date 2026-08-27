@@ -420,8 +420,8 @@ export default function Home({ data }) {
                 wordBreak="keep-all"
               >
                 {tr(
-                  "한 장의 사진에서 고양이와 강아지를 먼저 찾아 개체별로 분석합니다. 여러 마리나 사람·사물이 함께 있는 사진도 감지된 반려동물 영역을 기준으로 ViT Top-5와 CLIP 유사도 검색을 실행합니다.",
-                  "PetLens first detects cats and dogs, then analyzes each pet independently. Multi-pet photos and busy scenes are processed from the detected pet regions with ViT top-5 classification and CLIP similarity search."
+                  "한 장의 사진에서 고양이와 강아지를 먼저 찾아 개체별로 분석합니다. 강아지는 130개 품종 Dog-130 모델을, 고양이는 기존 Pet-37 모델을 사용하고 CLIP 유사도 검색을 함께 실행합니다.",
+                  "PetLens first detects cats and dogs, then analyzes each pet independently. Dogs use the 130-breed Dog-130 classifier, cats use Pet-37, and CLIP provides similarity retrieval."
                 )}
               </Text>
               <Flex

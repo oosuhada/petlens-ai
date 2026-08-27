@@ -50,6 +50,8 @@ export default function AnalyzeDrawer({
   const topPrediction = selectedPredictions[0];
   const selectedSegmentation = selectedPet?.segmentation || null;
   const selectedOpenSet = selectedPet?.open_set || analysis?.open_set || null;
+  const selectedClassifierScope = selectedPet?.classifier?.scope || "pet37";
+  const selectedClassifierLabel = selectedClassifierScope === "dog130" ? "DOG-130 · 130 BREEDS" : "PET-37 · 37 BREEDS";
   const selectedPose = (poseAnalysis?.poses || []).find((pose) => pose.pet_id === selectedPet?.id) || poseAnalysis?.poses?.[0] || null;
   const poseImage = poseAnalysis?.image || analysis?.image || null;
 
@@ -201,7 +203,7 @@ export default function AnalyzeDrawer({
                     </Text>
                     <Text mt="1" fontSize="xs" lineHeight="1.6" color={dark ? "whiteAlpha.500" : "gray.500"}>
                       {detectedPetCount > 1
-                        ? tr("각 개체를 따로 잘라 ViT 품종 예측과 CLIP 유사 이미지 검색을 실행했습니다.", "Each detected pet was cropped and analyzed independently with ViT and CLIP.")
+                        ? tr("각 개체를 따로 잘라 강아지는 Dog-130, 고양이는 Pet-37 분류기를 적용하고 CLIP 유사 이미지 검색을 실행했습니다.", "Each detected pet was cropped independently: dogs use Dog-130, cats use Pet-37, and CLIP provides gallery similarity retrieval.")
                         : tr("감지된 반려동물 영역을 기준으로 품종과 유사 이미지를 분석합니다.", "Breed and similarity results are computed from the detected pet region.")}
                     </Text>
                     {analysis?.segmentation?.status === "segmented" && (
@@ -243,7 +245,7 @@ export default function AnalyzeDrawer({
                             >
                               <Flex align="center" justify="space-between">
                                 <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.1em">
-                                  PET {petIndex + 1} · {pet.species.toUpperCase()}
+                                  PET {petIndex + 1} · {pet.species.toUpperCase()} · {pet.classifier?.scope === "dog130" ? "DOG-130" : "PET-37"}
                                 </Text>
                                 {typeof pet.detector_score === "number" && (
                                   <Text ml="4" color={dark ? "whiteAlpha.500" : "gray.500"} fontSize="10px">
@@ -281,6 +283,9 @@ export default function AnalyzeDrawer({
                           ? tr("선택한 개체의 가장 높은 예측", "SELECTED PET · TOP PREDICTION")
                           : tr("가장 높은 예측", "TOP PREDICTION")}
                       </Text>
+                      <Text mt="1" color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.08em">
+                        {selectedClassifierLabel}
+                      </Text>
                       <Text fontSize="2xl" fontWeight="800" mt="1" textTransform="capitalize" noOfLines={1}>{topPrediction?.label}</Text>
                     </Box>
                     <Text ml="4" color="pink.500" fontSize="2xl" fontWeight="800">{(topPrediction?.confidence * 100).toFixed(1)}%</Text>
@@ -303,7 +308,9 @@ export default function AnalyzeDrawer({
                   {selectedOpenSet?.is_uncertain && (
                     <Box mb="5" px="4" py="3" borderRadius="10px" border="1px solid" borderColor={dark ? "orange.300" : "orange.200"} bg={dark ? "rgba(192,86,33,0.12)" : "orange.50"}>
                       <Text fontSize="xs" fontWeight="800" color={dark ? "orange.200" : "orange.700"}>
-                        {tr("37개 지원 품종 밖일 가능성", "POSSIBLY OUTSIDE THE 37 SUPPORTED BREEDS")}
+                        {selectedClassifierScope === "dog130"
+                          ? tr("130개 강아지 품종 밖일 가능성", "POSSIBLY OUTSIDE THE 130 DOG BREEDS")
+                          : tr("37개 지원 품종 밖일 가능성", "POSSIBLY OUTSIDE THE 37 SUPPORTED BREEDS")}
                       </Text>
                       <Text mt="1" fontSize="xs" lineHeight="1.65" color={dark ? "whiteAlpha.700" : "gray.700"}>
                         {tr(

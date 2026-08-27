@@ -65,7 +65,7 @@ rsync -a --delete \
   "$MODEL_DIR/" "mac-mini:$REMOTE_MODEL/"
 
 ssh mac-mini "/usr/libexec/PlistBuddy -c 'Delete :EnvironmentVariables:PETLENS_DOG130_MODEL' '$REMOTE_PLIST' >/dev/null 2>&1 || true; /usr/libexec/PlistBuddy -c 'Add :EnvironmentVariables:PETLENS_DOG130_MODEL string $REMOTE_MODEL' '$REMOTE_PLIST'"
-ssh mac-mini 'uid=$(id -u); launchctl bootout gui/$uid "$HOME/Library/LaunchAgents/dev.oosu.petlens-api.plist" >/dev/null 2>&1 || true; launchctl bootstrap gui/$uid "$HOME/Library/LaunchAgents/dev.oosu.petlens-api.plist"; launchctl kickstart -k gui/$uid/dev.oosu.petlens-api'
+ssh mac-mini 'uid=$(id -u); launchctl bootout gui/$uid "$HOME/Library/LaunchAgents/dev.oosu.petlens-api.plist" >/dev/null 2>&1 || true; launchctl bootstrap gui/$uid "$HOME/Library/LaunchAgents/dev.oosu.petlens-api.plist"; launchctl kickstart -k gui/$uid/dev.oosu.petlens-api >/dev/null 2>&1 || true'
 
 echo "Waiting for API..."
 for _ in $(seq 1 30); do

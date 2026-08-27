@@ -17,7 +17,12 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 unzip -q "$ZIP_PATH" -d "$TMP_DIR"
 
-MODEL_DIR="$(find "$TMP_DIR" -type f -name config.json -print -quit | xargs -I{} dirname "{}")"
+SUMMARY_PATH="$(find "$TMP_DIR" -type f -name petlens_training_summary.json -print -quit)"
+if [[ -n "${SUMMARY_PATH:-}" ]]; then
+  MODEL_DIR="$(dirname "$SUMMARY_PATH")"
+else
+  MODEL_DIR="$(find "$TMP_DIR" -type f -name config.json ! -path '*/checkpoint-*/*' -print -quit | xargs -I{} dirname "{}")"
+fi
 if [[ -z "${MODEL_DIR:-}" || ! -f "$MODEL_DIR/config.json" ]]; then
   echo "Could not locate Hugging Face checkpoint config.json in archive." >&2
   exit 1
@@ -50,7 +55,14 @@ REMOTE_MODEL="$REMOTE_ROOT/models/dog130-vit"
 REMOTE_PLIST="$HOME/Library/LaunchAgents/dev.oosu.petlens-api.plist"
 
 ssh mac-mini "mkdir -p '$REMOTE_MODEL'"
-rsync -a --delete "$MODEL_DIR/" "mac-mini:$REMOTE_MODEL/"
+rsync -a --delete \
+  --exclude='checkpoint-*' \
+  --exclude='optimizer.pt' \
+  --exclude='scheduler.pt' \
+  --exclude='rng_state.pth' \
+  --exclude='trainer_state.json' \
+  --exclude='training_args.bin' \
+  "$MODEL_DIR/" "mac-mini:$REMOTE_MODEL/"
 
 ssh mac-mini "/usr/libexec/PlistBuddy -c 'Delete :EnvironmentVariables:PETLENS_DOG130_MODEL' '$REMOTE_PLIST' >/dev/null 2>&1 || true; /usr/libexec/PlistBuddy -c 'Add :EnvironmentVariables:PETLENS_DOG130_MODEL string $REMOTE_MODEL' '$REMOTE_PLIST'"
 ssh mac-mini 'uid=$(id -u); launchctl bootout gui/$uid "$HOME/Library/LaunchAgents/dev.oosu.petlens-api.plist" >/dev/null 2>&1 || true; launchctl bootstrap gui/$uid "$HOME/Library/LaunchAgents/dev.oosu.petlens-api.plist"; launchctl kickstart -k gui/$uid/dev.oosu.petlens-api'

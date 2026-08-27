@@ -20,10 +20,13 @@ import AnalyzeDrawer from "../components/AnalyzeDrawer";
 import ExplorerHeader from "../components/ExplorerHeader";
 import PhotoStage from "../components/PhotoStage";
 import PhotoTile from "../components/PhotoTile";
+import VideoAnalyzeDrawer from "../components/VideoAnalyzeDrawer";
 import usePetLensLocale from "../hooks/usePetLensLocale";
 import useReducedMotionPreference from "../hooks/useReducedMotionPreference";
 import {
   analyzePet,
+  analyzePetPose,
+  analyzePetVideo,
   compareRetrievalModels,
   compareSiglip2OpenSet,
   getCuratedPhotos,
@@ -36,6 +39,7 @@ export default function Home({ data }) {
   const dark = colorMode === "dark";
   const reducedMotion = useReducedMotionPreference();
   const drawer = useDisclosure();
+  const videoDrawer = useDisclosure();
   const toast = useToast();
 
   const [photos, setPhotos] = useState(data);
@@ -56,6 +60,13 @@ export default function Home({ data }) {
   const [advancedError, setAdvancedError] = useState("");
   const [isSiglipComparing, setIsSiglipComparing] = useState(false);
   const [isRetrievalComparing, setIsRetrievalComparing] = useState(false);
+  const [poseAnalysis, setPoseAnalysis] = useState(null);
+  const [poseError, setPoseError] = useState("");
+  const [isPoseAnalyzing, setIsPoseAnalyzing] = useState(false);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState("");
+  const [videoAnalysis, setVideoAnalysis] = useState(null);
+  const [videoError, setVideoError] = useState("");
+  const [isVideoAnalyzing, setIsVideoAnalyzing] = useState(false);
 
   const featured = useMemo(
     () => ["samoyed", "newfoundland", "ragdoll"].map((id) => data.find((photo) => photo.id === id)).filter(Boolean),
@@ -65,6 +76,10 @@ export default function Home({ data }) {
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
+
+  useEffect(() => () => {
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+  }, [videoPreviewUrl]);
 
   const resetGallery = () => {
     setPhotos(data);
@@ -77,6 +92,8 @@ export default function Home({ data }) {
     setSiglipComparison(null);
     setRetrievalComparison(null);
     setAdvancedError("");
+    setPoseAnalysis(null);
+    setPoseError("");
   };
 
   const handleSearch = async (event) => {
@@ -130,6 +147,8 @@ export default function Home({ data }) {
     setSiglipComparison(null);
     setRetrievalComparison(null);
     setAdvancedError("");
+    setPoseAnalysis(null);
+    setPoseError("");
     setAnalysisError("");
     setIsAnalyzing(true);
     drawer.onOpen();
@@ -192,6 +211,52 @@ export default function Home({ data }) {
       setAdvancedError(error.message || tr("검색 모델 비교를 실행할 수 없습니다.", "Retrieval comparison is unavailable."));
     } finally {
       setIsRetrievalComparing(false);
+    }
+  };
+
+  const handlePoseAnalyze = async () => {
+    if (!analysisFile || isPoseAnalyzing) return;
+    setIsPoseAnalyzing(true);
+    setPoseError("");
+    try {
+      const result = await analyzePetPose(analysisFile, 4);
+      setPoseAnalysis(result);
+    } catch (error) {
+      setPoseError(error.message || tr("동물 포즈 추정을 실행할 수 없습니다.", "Animal pose estimation is unavailable."));
+    } finally {
+      setIsPoseAnalyzing(false);
+    }
+  };
+
+  const handleVideoFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const allowedExtension = /\.(mp4|m4v|mov|webm)$/i.test(file.name || "");
+    if (!file.type.startsWith("video/") && !allowedExtension) {
+      setVideoError(tr("영상 파일을 선택해주세요.", "Please choose a video file."));
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 80 * 1024 * 1024) {
+      setVideoError(tr("80MB 이하 영상을 선택해주세요.", "Please choose a video under 80 MB."));
+      event.target.value = "";
+      return;
+    }
+
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoPreviewUrl(URL.createObjectURL(file));
+    setVideoAnalysis(null);
+    setVideoError("");
+    setIsVideoAnalyzing(true);
+    videoDrawer.onOpen();
+    try {
+      const result = await analyzePetVideo(file, 8);
+      setVideoAnalysis(result);
+    } catch (error) {
+      setVideoError(error.message || tr("영상 분석을 사용할 수 없습니다.", "Video analysis is unavailable."));
+    } finally {
+      setIsVideoAnalyzing(false);
+      event.target.value = "";
     }
   };
 
@@ -377,12 +442,24 @@ export default function Home({ data }) {
                 >
                   {analysis ? tr("분석 결과 보기", "View analysis") : tr("사진 선택", "Choose a photo")}
                 </Button>
+                <Button
+                  h="50px"
+                  px="6"
+                  mr={[4, 8, 12]}
+                  mb={[3, 0]}
+                  borderRadius="10px"
+                  variant="outline"
+                  borderColor={dark ? "whiteAlpha.300" : "blackAlpha.200"}
+                  onClick={videoDrawer.onOpen}
+                >
+                  {videoAnalysis ? tr("영상 결과 보기", "View video result") : tr("영상 분석", "Analyze video")}
+                </Button>
                 <Text
                   color={dark ? "whiteAlpha.400" : "gray.400"}
                   fontSize="xs"
                   lineHeight="1.5"
                 >
-                  JPG, PNG, WebP · {tr("최대 12MB", "up to 12 MB")}
+                  {tr("사진 12MB · 영상 80MB 이하", "Photo 12 MB · video 80 MB max")}
                 </Text>
               </Flex>
             </Box>
@@ -544,8 +621,23 @@ export default function Home({ data }) {
         advancedError={advancedError}
         isSiglipComparing={isSiglipComparing}
         isRetrievalComparing={isRetrievalComparing}
+        poseAnalysis={poseAnalysis}
+        poseError={poseError}
+        isPoseAnalyzing={isPoseAnalyzing}
         onSiglipCompare={handleSiglipCompare}
         onRetrievalCompare={handleRetrievalCompare}
+        onPoseAnalyze={handlePoseAnalyze}
+        tr={tr}
+      />
+
+      <VideoAnalyzeDrawer
+        isOpen={videoDrawer.isOpen}
+        onClose={videoDrawer.onClose}
+        onFile={handleVideoFile}
+        isAnalyzing={isVideoAnalyzing}
+        previewUrl={videoPreviewUrl}
+        analysis={videoAnalysis}
+        analysisError={videoError}
         tr={tr}
       />
     </Box>

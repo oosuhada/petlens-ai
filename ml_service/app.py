@@ -3,12 +3,14 @@ from __future__ import annotations
 import io
 import json
 import os
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import cv2
 import requests
 import torch
 import torch.nn.functional as F
@@ -27,6 +29,9 @@ from transformers import (
     Dinov2Model,
     Sam2Model,
     Sam2Processor,
+    Sam2VideoModel,
+    Sam2VideoProcessor,
+    VitPoseForPoseEstimation,
 )
 
 
@@ -40,6 +45,8 @@ DEFAULT_DETECTOR_MODEL = "IDEA-Research/grounding-dino-tiny"
 DEFAULT_SEGMENTATION_MODEL = "facebook/sam2-hiera-tiny"
 DEFAULT_DINO_MODEL = "facebook/dinov2-small"
 DEFAULT_SIGLIP2_MODEL = "google/siglip2-base-patch16-224"
+DEFAULT_VIDEO_MODEL = "facebook/sam2-hiera-tiny"
+DEFAULT_POSE_MODEL = "usyd-community/vitpose-plus-base"
 
 VIT_MODEL = os.getenv("PETLENS_VIT_MODEL", DEFAULT_VIT_MODEL)
 CLIP_MODEL_NAME = os.getenv("PETLENS_CLIP_MODEL", DEFAULT_CLIP_MODEL)
@@ -48,6 +55,10 @@ SEGMENTATION_MODEL = os.getenv("PETLENS_SEGMENTATION_MODEL", DEFAULT_SEGMENTATIO
 SEGMENTATION_ENABLED = os.getenv("PETLENS_SEGMENTATION_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
 DINO_MODEL = os.getenv("PETLENS_DINO_MODEL", DEFAULT_DINO_MODEL)
 SIGLIP2_MODEL = os.getenv("PETLENS_SIGLIP2_MODEL", DEFAULT_SIGLIP2_MODEL)
+VIDEO_MODEL = os.getenv("PETLENS_VIDEO_MODEL", DEFAULT_VIDEO_MODEL)
+POSE_MODEL = os.getenv("PETLENS_POSE_MODEL", DEFAULT_POSE_MODEL)
+VIDEO_MAX_MB = int(os.getenv("PETLENS_VIDEO_MAX_MB", "80"))
+VIDEO_MAX_FRAMES = int(os.getenv("PETLENS_VIDEO_MAX_FRAMES", "12"))
 DETECTION_THRESHOLD = float(os.getenv("PETLENS_DETECTION_THRESHOLD", "0.32"))
 DETECTION_TEXT_THRESHOLD = float(os.getenv("PETLENS_DETECTION_TEXT_THRESHOLD", "0.25"))
 DETECTION_LABELS = ["dog", "cat"]
@@ -117,6 +128,12 @@ class Runtime:
         self.siglip2_processor = None
         self.siglip2_model = None
         self.siglip2_error: str | None = None
+        self.video_processor = None
+        self.video_model = None
+        self.video_error: str | None = None
+        self.pose_processor = None
+        self.pose_model = None
+        self.pose_error: str | None = None
         self.gallery_embeddings: np.ndarray | None = None
 
     def load_vit(self) -> None:
@@ -187,6 +204,32 @@ class Runtime:
             self.siglip2_error = str(exc)
             raise
 
+    def load_video_tracker(self) -> None:
+        if self.video_model is not None:
+            return
+        if self.video_error:
+            raise RuntimeError(self.video_error)
+        try:
+            self.video_processor = Sam2VideoProcessor.from_pretrained(VIDEO_MODEL)
+            self.video_model = Sam2VideoModel.from_pretrained(VIDEO_MODEL)
+            self.video_model = self.video_model.to(DEVICE).eval()
+        except Exception as exc:
+            self.video_error = str(exc)
+            raise
+
+    def load_pose(self) -> None:
+        if self.pose_model is not None:
+            return
+        if self.pose_error:
+            raise RuntimeError(self.pose_error)
+        try:
+            self.pose_processor = AutoProcessor.from_pretrained(POSE_MODEL)
+            self.pose_model = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL)
+            self.pose_model = self.pose_model.to(DEVICE).eval()
+        except Exception as exc:
+            self.pose_error = str(exc)
+            raise
+
     def classify(self, image: Image.Image) -> list[dict[str, Any]]:
         self.load_vit()
         inputs = self.vit_processor(images=image, return_tensors="pt")
@@ -254,7 +297,7 @@ class Runtime:
             pet for pet in CATALOG
             if species not in {"dog", "cat"} or pet["species"] == species
         ]
-        prompts = [pet["breed"] for pet in candidates]
+        prompts = [f"a photo of a {pet['breed']} {pet['species']}" for pet in candidates]
         inputs = self.siglip2_processor(
             text=prompts,
             images=image,
@@ -282,6 +325,167 @@ class Runtime:
                 }
             )
         return results
+
+    @staticmethod
+    def _aggregate_predictions(
+        frame_predictions: list[list[dict[str, Any]]],
+        top_k: int = 5,
+    ) -> list[dict[str, Any]]:
+        if not frame_predictions:
+            return []
+        totals: dict[str, float] = {}
+        for predictions in frame_predictions:
+            for prediction in predictions:
+                label = str(prediction["label"])
+                totals[label] = totals.get(label, 0.0) + float(prediction["confidence"])
+        denominator = float(len(frame_predictions))
+        ranked = sorted(
+            ((label, score / denominator) for label, score in totals.items()),
+            key=lambda item: item[1],
+            reverse=True,
+        )[:top_k]
+        return [{"label": label, "confidence": float(score)} for label, score in ranked]
+
+    @staticmethod
+    def _mask_to_box(mask: np.ndarray) -> list[float] | None:
+        ys, xs = np.where(mask > 0)
+        if xs.size == 0 or ys.size == 0:
+            return None
+        return [float(xs.min()), float(ys.min()), float(xs.max() + 1), float(ys.max() + 1)]
+
+    def track_video(
+        self,
+        frames: list[Image.Image],
+        detections: list[dict[str, Any]],
+        max_track_frames: int | None = None,
+    ) -> list[dict[str, Any]]:
+        if not frames or not detections:
+            return []
+        self.load_video_tracker()
+        session = self.video_processor.init_video_session(
+            video=frames,
+            inference_device=DEVICE,
+            inference_state_device="cpu",
+            video_storage_device="cpu",
+            dtype=torch.float32,
+        )
+        obj_ids = list(range(1, len(detections) + 1))
+        input_boxes = [[
+            [float(value) for value in detection["box"]]
+            for detection in detections
+        ]]
+        self.video_processor.add_inputs_to_inference_session(
+            inference_session=session,
+            frame_idx=0,
+            obj_ids=obj_ids,
+            input_boxes=input_boxes,
+        )
+        session_obj_ids = [int(value) for value in session.obj_ids]
+        with torch.inference_mode():
+            self.video_model(inference_session=session, frame_idx=0)
+
+        tracks: dict[int, list[dict[str, Any]]] = {obj_id: [] for obj_id in session_obj_ids}
+        height, width = frames[0].height, frames[0].width
+        iterator = self.video_model.propagate_in_video_iterator(
+            session,
+            max_frame_num_to_track=max_track_frames or len(frames),
+        )
+        for output in iterator:
+            masks = self.video_processor.post_process_masks(
+                [output.pred_masks],
+                original_sizes=[[height, width]],
+                binarize=True,
+            )[0]
+            masks_np = masks.detach().cpu().numpy()
+            if masks_np.ndim == 4 and masks_np.shape[1] == 1:
+                masks_np = masks_np[:, 0]
+            output_obj_ids = [int(value) for value in (getattr(output, "object_ids", None) or session.obj_ids)]
+            for index, obj_id in enumerate(output_obj_ids):
+                if index >= len(masks_np):
+                    continue
+                box = self._mask_to_box(masks_np[index])
+                if not box:
+                    continue
+                tracks.setdefault(obj_id, []).append(
+                    {
+                        "frame_index": int(output.frame_idx),
+                        "box": box,
+                        "mask_area_ratio": float((masks_np[index] > 0).mean()),
+                    }
+                )
+
+        results: list[dict[str, Any]] = []
+        for index, detection in enumerate(detections):
+            obj_id = session_obj_ids[index] if index < len(session_obj_ids) else obj_ids[index]
+            timeline = tracks.get(obj_id, [])
+            results.append(
+                {
+                    "id": f"track-{obj_id}",
+                    "species": detection["species"],
+                    "detector_score": detection.get("score"),
+                    "initial_box": detection["box"],
+                    "timeline": timeline,
+                }
+            )
+        return results
+
+    def estimate_pose(
+        self,
+        image: Image.Image,
+        detections: list[dict[str, Any]],
+        threshold: float = 0.25,
+    ) -> list[dict[str, Any]]:
+        if not detections:
+            return []
+        self.load_pose()
+        boxes = np.asarray(
+            [
+                [
+                    detection["box"][0],
+                    detection["box"][1],
+                    detection["box"][2] - detection["box"][0],
+                    detection["box"][3] - detection["box"][1],
+                ]
+                for detection in detections
+            ],
+            dtype=np.float32,
+        )
+        inputs = self.pose_processor(image, boxes=[boxes], return_tensors="pt")
+        model_inputs = {
+            key: value.to(DEVICE) if hasattr(value, "to") else value
+            for key, value in inputs.items()
+        }
+        dataset_index = torch.tensor([3], device=DEVICE)
+        with torch.inference_mode():
+            outputs = self.pose_model(**model_inputs, dataset_index=dataset_index)
+        processed = self.pose_processor.post_process_pose_estimation(
+            outputs,
+            boxes=[boxes],
+            threshold=threshold,
+        )[0]
+        pose_results: list[dict[str, Any]] = []
+        for index, pose in enumerate(processed):
+            keypoints = []
+            for point, label, score in zip(pose["keypoints"], pose["labels"], pose["scores"]):
+                label_id = int(label.detach().cpu().item() if hasattr(label, "detach") else label)
+                point_values = point.detach().cpu().tolist() if hasattr(point, "detach") else list(point)
+                score_value = float(score.detach().cpu().item() if hasattr(score, "detach") else score)
+                keypoints.append(
+                    {
+                        "label": self.pose_model.config.id2label.get(label_id, str(label_id)),
+                        "x": float(point_values[0]),
+                        "y": float(point_values[1]),
+                        "score": score_value,
+                    }
+                )
+            pose_results.append(
+                {
+                    "pet_id": f"pet-{index + 1}",
+                    "species": detections[index]["species"] if index < len(detections) else "unknown",
+                    "keypoints": keypoints,
+                }
+            )
+        return pose_results
 
     def ensure_gallery_index(self) -> None:
         if self.gallery_embeddings is not None:
@@ -608,6 +812,72 @@ async def read_image(file: UploadFile) -> Image.Image:
         raise HTTPException(status_code=400, detail="Unable to decode the uploaded image.") from exc
 
 
+async def read_video_frames(file: UploadFile) -> tuple[list[Image.Image], dict[str, Any]]:
+    content_type = file.content_type or ""
+    allowed_types = {"video/mp4", "video/webm", "video/quicktime", "video/x-m4v"}
+    suffix = Path(file.filename or "video.mp4").suffix.lower() or ".mp4"
+    allowed_suffixes = {".mp4", ".m4v", ".mov", ".webm"}
+    if (
+        content_type not in allowed_types
+        and not content_type.startswith("video/")
+        and not (content_type in {"application/octet-stream", ""} and suffix in allowed_suffixes)
+    ):
+        raise HTTPException(status_code=400, detail="Please upload a video file.")
+    payload = await file.read()
+    if len(payload) > VIDEO_MAX_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"Video must be smaller than {VIDEO_MAX_MB} MB.")
+
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as handle:
+            handle.write(payload)
+            temp_path = handle.name
+
+        capture = cv2.VideoCapture(temp_path)
+        if not capture.isOpened():
+            raise HTTPException(status_code=400, detail="Unable to decode the uploaded video.")
+        fps = float(capture.get(cv2.CAP_PROP_FPS) or 0.0)
+        total_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        if total_frames <= 0 or width <= 0 or height <= 0:
+            capture.release()
+            raise HTTPException(status_code=400, detail="Video metadata is unavailable.")
+
+        sample_count = min(VIDEO_MAX_FRAMES, total_frames)
+        indices = np.linspace(0, total_frames - 1, sample_count, dtype=int).tolist()
+        frames: list[Image.Image] = []
+        sampled_indices: list[int] = []
+        for frame_index in indices:
+            capture.set(cv2.CAP_PROP_POS_FRAMES, int(frame_index))
+            ok, frame = capture.read()
+            if not ok or frame is None:
+                continue
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frames.append(Image.fromarray(rgb).convert("RGB"))
+            sampled_indices.append(int(frame_index))
+        capture.release()
+        if not frames:
+            raise HTTPException(status_code=400, detail="No decodable video frames were found.")
+
+        duration_seconds = (total_frames / fps) if fps > 0 else None
+        return frames, {
+            "fps": fps,
+            "total_frames": total_frames,
+            "duration_seconds": duration_seconds,
+            "width": width,
+            "height": height,
+            "sampled_frame_indices": sampled_indices,
+            "sampled_frame_count": len(frames),
+        }
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     return {
@@ -635,6 +905,12 @@ def health() -> dict[str, Any]:
         "siglip2_model": SIGLIP2_MODEL,
         "siglip2_ready": runtime.siglip2_model is not None,
         "siglip2_error": runtime.siglip2_error,
+        "video_model": VIDEO_MODEL,
+        "video_ready": runtime.video_model is not None,
+        "video_error": runtime.video_error,
+        "pose_model": POSE_MODEL,
+        "pose_ready": runtime.pose_model is not None,
+        "pose_error": runtime.pose_error,
         "gallery_size": len(CATALOG),
         "gallery_index_ready": runtime.gallery_embeddings is not None,
         "gallery_cache_ready": GALLERY_CACHE_PATH.exists(),
@@ -777,6 +1053,151 @@ async def open_set_siglip2(
             "vit_top1": vit_top,
             "siglip2_top1": siglip_top,
             "note": "This is a zero-shot comparison, not a calibrated unknown-breed probability.",
+        },
+    }
+
+
+@app.post("/pose")
+async def pose_estimation(
+    file: UploadFile = File(...),
+    max_pets: int = Query(default=4, ge=1, le=6),
+    threshold: float = Query(default=0.25, ge=0.05, le=0.9),
+) -> dict[str, Any]:
+    image = await read_image(file)
+    try:
+        detections = runtime.detect_pets(image, max_pets=max_pets)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Pet detector unavailable: {exc}") from exc
+    if not detections:
+        return {
+            "model": POSE_MODEL,
+            "dataset_expert": "AP-10K",
+            "detected_pet_count": 0,
+            "poses": [],
+        }
+    try:
+        poses = runtime.estimate_pose(image, detections, threshold=threshold)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Animal pose estimation unavailable: {exc}") from exc
+    width, height = image.size
+    return {
+        "model": POSE_MODEL,
+        "dataset_expert": "AP-10K",
+        "image": {"width": width, "height": height},
+        "detected_pet_count": len(detections),
+        "poses": poses,
+    }
+
+
+@app.post("/analyze/video")
+async def analyze_video(
+    file: UploadFile = File(...),
+    top_k: int = Query(default=8, ge=1, le=37),
+    max_pets: int = Query(default=4, ge=1, le=6),
+) -> dict[str, Any]:
+    frames, metadata = await read_video_frames(file)
+    first_frame = frames[0]
+    try:
+        detections = runtime.detect_pets(first_frame, max_pets=max_pets)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Video pet detector unavailable: {exc}") from exc
+    if not detections:
+        return {
+            "version": "2.0-video",
+            "video": metadata,
+            "detected_pet_count": 0,
+            "tracks": [],
+            "note": "No cat or dog was detected on the first sampled frame.",
+        }
+
+    try:
+        tracks = runtime.track_video(frames, detections, max_track_frames=len(frames))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"SAM2 video tracking unavailable: {exc}") from exc
+
+    sampled_indices = metadata["sampled_frame_indices"]
+    enriched_tracks: list[dict[str, Any]] = []
+    for track_index, track in enumerate(tracks):
+        timeline = track.get("timeline", [])
+        if not timeline:
+            enriched_tracks.append({**track, "predictions": [], "results": [], "motion": {"status": "not_tracked"}})
+            continue
+
+        representative_positions = sorted(set([0, len(timeline) // 2, len(timeline) - 1]))
+        crops: list[Image.Image] = []
+        frame_predictions: list[list[dict[str, Any]]] = []
+        centers: list[tuple[float, float]] = []
+        for position in representative_positions:
+            entry = timeline[position]
+            sampled_frame_index = int(entry["frame_index"])
+            if sampled_frame_index >= len(frames):
+                continue
+            box = entry["box"]
+            crop = runtime._crop_with_padding(frames[sampled_frame_index], box, padding_ratio=0.04)
+            crops.append(crop)
+            frame_predictions.append(runtime.classify(crop))
+            centers.append(((box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0))
+
+        predictions = runtime._aggregate_predictions(frame_predictions)
+        if crops:
+            embeddings = runtime.image_embedding(crops)
+            mean_embedding = embeddings.mean(axis=0, keepdims=True)
+            mean_embedding /= np.linalg.norm(mean_embedding, axis=-1, keepdims=True).clip(min=1e-12)
+            matches = runtime.rank(mean_embedding.astype(np.float32), top_k)
+        else:
+            matches = []
+
+        motion_distance = 0.0
+        for first, second in zip(centers, centers[1:]):
+            motion_distance += float(np.hypot(second[0] - first[0], second[1] - first[1]))
+        diagonal = max(1.0, float(np.hypot(first_frame.width, first_frame.height)))
+        normalized_motion = motion_distance / diagonal
+        if normalized_motion < 0.05:
+            motion_label = "mostly_stationary"
+        elif normalized_motion < 0.22:
+            motion_label = "moving"
+        else:
+            motion_label = "high_motion"
+
+        enriched_timeline = []
+        for entry in timeline:
+            sampled_position = int(entry["frame_index"])
+            original_frame_index = sampled_indices[sampled_position] if sampled_position < len(sampled_indices) else sampled_position
+            timestamp = (original_frame_index / metadata["fps"]) if metadata["fps"] > 0 else None
+            enriched_timeline.append(
+                {
+                    **entry,
+                    "original_frame_index": int(original_frame_index),
+                    "timestamp_seconds": timestamp,
+                    "box_payload": runtime._box_payload(entry["box"], first_frame.width, first_frame.height),
+                }
+            )
+
+        enriched_tracks.append(
+            {
+                **track,
+                "timeline": enriched_timeline,
+                "predictions": predictions,
+                "results": matches,
+                "motion": {
+                    "status": motion_label,
+                    "normalized_displacement": normalized_motion,
+                    "note": "Motion is a geometric tracking descriptor, not semantic action recognition.",
+                },
+            }
+        )
+
+    return {
+        "version": "2.0-video",
+        "video": metadata,
+        "detected_pet_count": len(detections),
+        "tracking_model": VIDEO_MODEL,
+        "tracks": enriched_tracks,
+        "models": {
+            "detector": DETECTOR_MODEL,
+            "tracker": VIDEO_MODEL,
+            "classifier": VIT_MODEL,
+            "retrieval": CLIP_MODEL_NAME,
         },
     }
 

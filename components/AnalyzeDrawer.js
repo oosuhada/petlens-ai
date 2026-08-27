@@ -32,8 +32,12 @@ export default function AnalyzeDrawer({
   advancedError,
   isSiglipComparing,
   isRetrievalComparing,
+  poseAnalysis,
+  poseError,
+  isPoseAnalyzing,
   onSiglipCompare,
   onRetrievalCompare,
+  onPoseAnalyze,
   tr,
 }) {
   const inputRef = useRef(null);
@@ -46,6 +50,8 @@ export default function AnalyzeDrawer({
   const topPrediction = selectedPredictions[0];
   const selectedSegmentation = selectedPet?.segmentation || null;
   const selectedOpenSet = selectedPet?.open_set || analysis?.open_set || null;
+  const selectedPose = (poseAnalysis?.poses || []).find((pose) => pose.pet_id === selectedPet?.id) || poseAnalysis?.poses?.[0] || null;
+  const poseImage = poseAnalysis?.image || analysis?.image || null;
 
   return (
     <Drawer isOpen={isOpen} placement="right" size="md" onClose={onClose} finalFocusRef={inputRef}>
@@ -150,6 +156,23 @@ export default function AnalyzeDrawer({
                       {index + 1} · {pet.species.toUpperCase()}
                     </Text>
                   </Box>
+                ))}
+                {selectedPose && poseImage && (selectedPose.keypoints || []).map((keypoint, index) => (
+                  <Box
+                    key={`${selectedPose.pet_id}-${keypoint.label}-${index}`}
+                    position="absolute"
+                    left={`${(keypoint.x / poseImage.width) * 100}%`}
+                    top={`${(keypoint.y / poseImage.height) * 100}%`}
+                    transform="translate(-50%, -50%)"
+                    w="9px"
+                    h="9px"
+                    borderRadius="full"
+                    bg="cyan.300"
+                    border="2px solid white"
+                    boxShadow="0 1px 6px rgba(0,0,0,.45)"
+                    pointerEvents="none"
+                    title={`${keypoint.label} ${(keypoint.score * 100).toFixed(0)}%`}
+                  />
                 ))}
                 {isAnalyzing && (
                   <Flex position="absolute" inset="0" bg={dark ? "rgba(20,17,24,0.78)" : "rgba(255,255,255,0.82)"} align="center" justify="center" direction="column">
@@ -335,12 +358,42 @@ export default function AnalyzeDrawer({
                       >
                         {tr("CLIP · DINOv2 비교", "Compare CLIP · DINOv2")}
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        borderRadius="10px"
+                        isLoading={isPoseAnalyzing}
+                        loadingText="Pose"
+                        onClick={onPoseAnalyze}
+                      >
+                        {tr("동물 포즈 추정", "Estimate animal pose")}
+                      </Button>
                     </Stack>
 
                     {advancedError && (
                       <Text mt="3" fontSize="xs" color={dark ? "red.200" : "red.600"}>
                         {advancedError}
                       </Text>
+                    )}
+
+                    {poseError && (
+                      <Text mt="3" fontSize="xs" color={dark ? "red.200" : "red.600"}>
+                        {poseError}
+                      </Text>
+                    )}
+
+                    {selectedPose && (
+                      <Box mt="5" px="4" py="4" borderRadius="12px" bg={dark ? "#19151d" : "white"} border="1px solid" borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"}>
+                        <Text fontSize="10px" fontWeight="800" letterSpacing="0.1em" color="cyan.400">
+                          VITPOSE++ · AP-10K
+                        </Text>
+                        <Text mt="2" fontSize="sm" fontWeight="700">
+                          {tr(`${(selectedPose.keypoints || []).length}개 keypoint를 표시했습니다.`, `${(selectedPose.keypoints || []).length} keypoints rendered.`)}
+                        </Text>
+                        <Text mt="1.5" fontSize="xs" lineHeight="1.65" color={dark ? "whiteAlpha.500" : "gray.500"}>
+                          {(selectedPose.keypoints || []).slice(0, 6).map((point) => `${point.label} ${(point.score * 100).toFixed(0)}%`).join(" · ")}
+                        </Text>
+                      </Box>
                     )}
 
                     {siglipComparison && (

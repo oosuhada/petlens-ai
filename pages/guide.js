@@ -84,9 +84,20 @@ export default function Guide() {
       <Head><title>{tr("결과 읽는 법", "Guide")} · PetLens</title></Head>
 
       <Flex h="68px" px={[3, 6, 8]} align="center" gap="1" borderBottom="1px solid" borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}>
-        <Link href="/" passHref><Button as="a" variant="ghost" size="sm" leftIcon={<ArrowBackIcon />} mr="2">{tr("갤러리", "Gallery")}</Button></Link>
         <BrandMark dark={dark} compact />
         <Box flex="1" />
+        <Link href="/" passHref>
+          <Button
+            as="a"
+            variant="ghost"
+            size="sm"
+            leftIcon={<ArrowBackIcon />}
+            mr={[1, 2]}
+            px={[2, 3]}
+          >
+            {tr("갤러리", "Gallery")}
+          </Button>
+        </Link>
         <Button size="xs" variant="ghost" mr="1" onClick={() => changeLanguage(isKo ? "en" : "ko")}>{isKo ? "EN" : "한"}</Button>
         <Button size="sm" variant="ghost" px="2" minW="34px" onClick={toggleColorMode}>{dark ? <SunIcon /> : <MoonIcon />}</Button>
       </Flex>

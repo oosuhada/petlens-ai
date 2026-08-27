@@ -182,7 +182,7 @@ export default function Home({ data }) {
           >
             <Box
               flex="1"
-              mb={[7, 9, 12]}
+              mb={[4, 5, 6]}
               bg={dark ? "#17131d" : "white"}
               border="1px solid"
               borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"}

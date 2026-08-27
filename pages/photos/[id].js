@@ -43,14 +43,20 @@ export default function PhotoDetail({ pic }) {
         top="0"
         zIndex="20"
       >
-        <Link href="/" passHref>
-          <IconButton as="a" aria-label={tr("갤러리로 돌아가기", "Back to gallery")} icon={<ArrowBackIcon />} variant="ghost" mr="2" />
-        </Link>
         <BrandMark dark={dark} compact />
         <Box flex="1" />
         <Flex align="center">
           <Button mr="1" size="xs" variant="ghost" onClick={() => changeLanguage(isKo ? "en" : "ko")}>{isKo ? "EN" : "한"}</Button>
           <IconButton aria-label={dark ? "라이트 모드" : "다크 모드"} icon={dark ? <SunIcon /> : <MoonIcon />} size="sm" variant="ghost" onClick={toggleColorMode} />
+          <Link href="/" passHref>
+            <IconButton
+              as="a"
+              aria-label={tr("갤러리로 돌아가기", "Back to gallery")}
+              icon={<ArrowBackIcon />}
+              variant="ghost"
+              ml="2"
+            />
+          </Link>
         </Flex>
       </Flex>
 
@@ -135,7 +141,7 @@ export default function PhotoDetail({ pic }) {
               target="_blank"
               rel="noopener noreferrer"
               flex="1"
-              ml={[4, 5, 6]}
+              ml={["8px", "10px", "12px"]}
               minH="52px"
               borderRadius="12px"
               variant="outline"

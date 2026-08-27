@@ -433,26 +433,26 @@ export default function Home({ data }) {
                 <Button
                   h="50px"
                   px="6"
-                  mr={[4, 8, 12]}
+                  mr={["4px", "8px", "12px"]}
                   borderRadius="10px"
                   bg={dark ? "white" : "#241c2c"}
                   color={dark ? "#241c2c" : "white"}
                   onClick={drawer.onOpen}
                   _hover={{ opacity: 0.9 }}
                 >
-                  {analysis ? tr("분석 결과 보기", "View analysis") : tr("사진 선택", "Choose a photo")}
+                  {tr("사진 업로드", "Upload photo")}
                 </Button>
                 <Button
                   h="50px"
                   px="6"
-                  mr={[4, 8, 12]}
+                  mr={["4px", "8px", "12px"]}
                   mb={[3, 0]}
                   borderRadius="10px"
                   variant="outline"
                   borderColor={dark ? "whiteAlpha.300" : "blackAlpha.200"}
                   onClick={videoDrawer.onOpen}
                 >
-                  {videoAnalysis ? tr("영상 결과 보기", "View video result") : tr("영상 분석", "Analyze video")}
+                  {tr("영상 업로드", "Upload video")}
                 </Button>
                 <Text
                   color={dark ? "whiteAlpha.400" : "gray.400"}

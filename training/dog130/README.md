@@ -54,3 +54,27 @@ PETLENS_DOG130_MODEL=/Users/gabrieljang/sites/petlens-ai/models/dog130-vit
 ```
 
 PetLens API는 기존 Oxford-IIIT 37-class 모델을 고양이 및 legacy reference 모델로 유지하고, detector가 `dog`를 반환했을 때 Dog-130 classifier를 우선 사용하는 hierarchical 구조로 확장합니다.
+
+## Completed training run
+
+2026-08-27 Colab A100 실행 결과:
+
+- GPU: `NVIDIA A100-SXM4-40GB`
+- train examples: `65,228`
+- validation examples: `5,200`
+- epochs: `3`
+- train / eval batch size: `32 / 64`
+- validation accuracy: `0.8678846154`
+- macro precision: `0.8812951476`
+- macro recall: `0.8678846154`
+- macro F1: `0.8663649887`
+- label count: `130`
+- artifact zip size: `2,221,390,831 bytes`
+
+Colab artifact paths:
+
+```text
+/content/drive/MyDrive/PetLens/dog130-vit
+/content/drive/MyDrive/PetLens/dog130-vit/petlens_training_summary.json
+/content/drive/MyDrive/PetLens/petlens-dog130-vit.zip
+```

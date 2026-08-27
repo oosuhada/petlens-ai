@@ -9,6 +9,7 @@ Live demo: **[petlens.oosu.dev](https://petlens.oosu.dev/)** · [시작하기](h
 PetLens는 「생성형 AI 기반 멀티모달 AI 서비스 개발 과정」에서 진행한 이미지 분류·멀티모달 검색 실습을 Colab 노트북 결과로 끝내지 않고, 브라우저에서 직접 사용할 수 있는 작은 웹 서비스로 연결한 프로젝트입니다.
 
 - **ViT**: Oxford-IIIT Pet 37개 품종 분류, Top-5 prediction
+- **Dog-130 ViT**: Tsinghua Dogs 130개 개 품종 확장 classifier (hierarchical dog branch)
 - **CLIP**: 자연어 → 이미지 검색, 이미지 → 유사 이미지 검색
 - **Grounding DINO**: 복잡한 사진에서 cat / dog 위치 감지, 여러 마리 개별 crop 분석
 - **SAM2**: 감지된 반려동물 segmentation 및 짧은 영상 object tracking
@@ -113,6 +114,21 @@ PetLens 2.0은 업로드 이미지를 바로 전체-frame classifier에 넣지 �
 #### 실제 이미지 Top-5 inference
 
 <img src="docs/screenshots/colab-03-vit-inference.png" alt="ViT inference" width="900" />
+
+### Dog-130 fine-tuning — Tsinghua Dogs
+
+PetLens 2.0의 dog branch를 37-class 한계에서 확장하기 위해 `google/vit-base-patch16-224`를 Tsinghua Dogs 130개 품종에 fine-tuning했습니다. 학습은 전체 train 65,228장 / validation 5,200장을 사용해 3 epochs 수행했고, A100 40GB에서 batch size 32 / 64를 유지했습니다.
+
+| Metric | Result |
+| --- | ---: |
+| Validation Accuracy | **0.86788** |
+| Macro Precision | **0.88130** |
+| Macro Recall | **0.86788** |
+| Macro F1 | **0.86636** |
+| Classes | **130** |
+| GPU | **NVIDIA A100-SXM4-40GB** |
+
+Production API는 `PETLENS_DOG130_MODEL`이 설정되면 Grounding DINO가 `dog`로 감지한 개체에 Dog-130 classifier를 우선 사용하고, `cat`은 기존 Oxford-IIIT Pet 37-class classifier를 유지합니다. Dog-130 checkpoint가 없거나 로딩에 실패하면 기존 37-class 모델로 안전하게 fallback합니다.
 
 ### CLIP retrieval — Flickr30k
 

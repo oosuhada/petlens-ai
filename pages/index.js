@@ -282,7 +282,13 @@ export default function Home({ data }) {
                   "Upload one clear cat or dog photo. ViT returns the top five breed probabilities while CLIP re-ranks the gallery by image similarity."
                 )}
               </Text>
-              <Flex mt="5" align="center" wrap="wrap" gap="3">
+              <Flex
+                mt="5"
+                align={["flex-start", "center"]}
+                direction={["column", "row"]}
+                wrap={["nowrap", "wrap"]}
+                gap={["3", "5"]}
+              >
                 <Button
                   h="50px"
                   px="6"
@@ -294,7 +300,11 @@ export default function Home({ data }) {
                 >
                   {analysis ? tr("분석 결과 보기", "View analysis") : tr("사진 선택", "Choose a photo")}
                 </Button>
-                <Text color={dark ? "whiteAlpha.400" : "gray.400"} fontSize="xs">
+                <Text
+                  color={dark ? "whiteAlpha.400" : "gray.400"}
+                  fontSize="xs"
+                  lineHeight="1.5"
+                >
                   JPG, PNG, WebP · {tr("최대 12MB", "up to 12 MB")}
                 </Text>
               </Flex>

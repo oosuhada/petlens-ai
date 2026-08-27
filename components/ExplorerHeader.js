@@ -2,11 +2,18 @@ import Link from "next/link";
 import {
   Box,
   Button,
+  Drawer,
+  DrawerBody,
+  DrawerCloseButton,
+  DrawerContent,
+  DrawerHeader,
+  DrawerOverlay,
   Flex,
   IconButton,
   useColorMode,
+  useDisclosure,
 } from "@chakra-ui/react";
-import { MoonIcon, SunIcon } from "@chakra-ui/icons";
+import { HamburgerIcon, MoonIcon, SunIcon } from "@chakra-ui/icons";
 
 import BrandMark from "./BrandMark";
 
@@ -17,6 +24,7 @@ export default function ExplorerHeader({
 }) {
   const { colorMode, toggleColorMode } = useColorMode();
   const dark = colorMode === "dark";
+  const mobileMenu = useDisclosure();
 
   return (
     <Box
@@ -65,7 +73,6 @@ export default function ExplorerHeader({
           </Link>
 
           <Flex
-            display={["none", "flex"]}
             ml={[2, 4, 5]}
             mr={[1, 2, 3]}
             border="1px solid"
@@ -108,8 +115,69 @@ export default function ExplorerHeader({
             color={dark ? "yellow.200" : "purple.700"}
             onClick={toggleColorMode}
           />
+
+          <IconButton
+            aria-label={tr("모바일 메뉴 열기", "Open mobile menu")}
+            icon={<HamburgerIcon />}
+            display={["inline-flex", "inline-flex", "none"]}
+            size="sm"
+            variant="ghost"
+            color={dark ? "whiteAlpha.900" : "gray.700"}
+            onClick={mobileMenu.onOpen}
+          />
         </Flex>
       </Flex>
+
+      <Drawer
+        isOpen={mobileMenu.isOpen}
+        placement="right"
+        onClose={mobileMenu.onClose}
+        size="xs"
+      >
+        <DrawerOverlay />
+        <DrawerContent bg={dark ? "#17131d" : "white"}>
+          <DrawerCloseButton mt="2" />
+          <DrawerHeader
+            borderBottom="1px solid"
+            borderColor={dark ? "whiteAlpha.100" : "blackAlpha.100"}
+          >
+            PetLens
+          </DrawerHeader>
+          <DrawerBody py="5">
+            <Flex direction="column" gap="2">
+              <Button
+                as="a"
+                href="#explore-tools"
+                justifyContent="flex-start"
+                variant="ghost"
+                onClick={mobileMenu.onClose}
+              >
+                {tr("탐색 도구", "Explore")}
+              </Button>
+              <Link href="/guide" passHref>
+                <Button
+                  as="a"
+                  justifyContent="flex-start"
+                  variant="ghost"
+                  onClick={mobileMenu.onClose}
+                >
+                  {tr("가이드", "Guide")}
+                </Button>
+              </Link>
+              <Link href="/onboarding" passHref>
+                <Button
+                  as="a"
+                  justifyContent="flex-start"
+                  variant="ghost"
+                  onClick={mobileMenu.onClose}
+                >
+                  {tr("사용 방법", "How to use")}
+                </Button>
+              </Link>
+            </Flex>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
     </Box>
   );
 }

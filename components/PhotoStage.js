@@ -19,7 +19,7 @@ function FeaturedCard({ photo, position, pointer, depth, reducedMotion, dark }) 
       top={position.top}
       zIndex={position.zIndex}
       transform={`translate3d(${offsetX}px, ${offsetY}px, ${depth}px) rotate(${rotation + (reducedMotion ? 0 : pointer.x * 1.8)}deg)`}
-      transformStyle="preserve-3d"
+      style={{ transformStyle: "preserve-3d" }}
       transition={reducedMotion ? "none" : "transform 120ms ease-out"}
     >
       <Box
@@ -148,10 +148,16 @@ export default function PhotoStage({ featured, tr }) {
 
         <Box
           position="relative"
-          minH={["190px", "220px", "330px"]}
-          overflow="hidden"
+          minH={["220px", "250px", "360px"]}
+          overflow="visible"
           mt={[5, 6, 0]}
-          style={{ perspective: "1000px" }}
+          px={[2, 3, 4]}
+          py={[2, 3, 4]}
+          style={{
+            perspective: "1000px",
+            perspectiveOrigin: "68% 42%",
+            transformStyle: "preserve-3d",
+          }}
         >
           <Box
             position="absolute"
@@ -167,26 +173,26 @@ export default function PhotoStage({ featured, tr }) {
           <FeaturedCard
             photo={samoyed}
             pointer={pointer}
-            depth={16}
+            depth={24}
             reducedMotion={reducedMotion}
             dark={dark}
-            position={{ width: "42%", height: "68%", right: "7%", top: "11%", rotate: "5deg", zIndex: 3 }}
+            position={{ width: "44%", height: "70%", right: "7%", top: "9%", rotate: "6deg", zIndex: 3 }}
           />
           <FeaturedCard
             photo={ragdoll}
             pointer={pointer}
-            depth={10}
+            depth={16}
             reducedMotion={reducedMotion}
             dark={dark}
-            position={{ width: "38%", height: "61%", right: "39%", top: "27%", rotate: "-6deg", zIndex: 2 }}
+            position={{ width: "40%", height: "63%", right: "40%", top: "25%", rotate: "-7deg", zIndex: 2 }}
           />
           <FeaturedCard
             photo={newfoundland}
             pointer={pointer}
-            depth={20}
+            depth={30}
             reducedMotion={reducedMotion}
             dark={dark}
-            position={{ width: "31%", height: "51%", right: "2%", top: "52%", rotate: "2deg", zIndex: 4 }}
+            position={{ width: "33%", height: "53%", right: "1%", top: "50%", rotate: "3deg", zIndex: 4 }}
           />
 
           <Badge

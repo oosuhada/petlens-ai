@@ -1,6 +1,6 @@
 # PetLens
 
-**ViT fine-tuning + CLIP semantic retrieval을 실제 웹 서비스 흐름으로 연결한 멀티모달 개인 프로젝트**
+**Pet detection + ViT fine-tuning + CLIP semantic retrieval을 실제 웹 서비스 흐름으로 연결한 멀티모달 개인 프로젝트**
 
 GitHub: https://github.com/oosuhada/petlens-ai
 
@@ -10,8 +10,11 @@ PetLens는 「생성형 AI 기반 멀티모달 AI 서비스 개발 과정」에�
 
 - **ViT**: Oxford-IIIT Pet 37개 품종 분류, Top-5 prediction
 - **CLIP**: 자연어 → 이미지 검색, 이미지 → 유사 이미지 검색
+- **Grounding DINO**: 복잡한 사진에서 cat / dog 위치 감지, 여러 마리 개별 crop 분석
 - **Web**: Next.js + Chakra UI
 - **ML serving**: FastAPI + PyTorch + Hugging Face Transformers
+
+현재 `main`은 PetLens 2.0 개발선입니다. 기존 37-class 단일 이미지 분석 버전은 `petlens-1.0` 브랜치에 보존했습니다.
 
 > UI는 사진 탐색에 집중한 기존 갤러리의 색상, 카드 비율, 검색바, 상세 페이지 흐름을 유지하고 Pexels 기능을 Oxford-IIIT Pet + ViT/CLIP 기능으로 교체했습니다.
 
@@ -35,14 +38,19 @@ Oxford-IIIT Pet의 37개 클래스가 웹 갤러리의 탐색 단위가 됩니�
 
 <img src="docs/screenshots/web-02-clip-text-search.png" alt="PetLens CLIP text search" width="900" />
 
-### 3. 사진 업로드 → ViT 품종 분석 + CLIP 유사 이미지
+### 3. 사진 업로드 → pet detection + 개체별 ViT / CLIP 분석
 
-사용자가 사진을 업로드하면 동일 이미지가 두 경로로 처리됩니다.
+PetLens 2.0은 업로드 이미지를 바로 전체-frame classifier에 넣지 않습니다.
 
-1. ViT classifier → 37개 품종 중 Top-5 확률
-2. CLIP image encoder → gallery에서 의미적으로 유사한 이미지 검색
+1. Grounding DINO → 사진 속 cat / dog bounding box 감지
+2. 감지된 개체별 crop 생성
+3. 각 crop을 ViT classifier에 입력 → 37개 품종 중 Top-5 확률
+4. 각 crop을 CLIP image encoder에 입력 → gallery 유사 이미지 검색
+5. 여러 마리가 감지되면 각 개체 결과를 독립적으로 반환
 
-Oxford-IIIT Pet의 Newfoundland 샘플을 넣은 실제 로컬 검증에서는 Newfoundland가 1위로 분류되었습니다.
+강아지와 고양이를 한 장으로 합친 Mac mini 실제 검증에서는 두 개체를 각각 `dog`, `cat`으로 감지했고, 개별 ViT 결과가 Chihuahua와 Ragdoll로 분리되었습니다. 같은 crop으로 실행한 CLIP 검색도 각각 Chihuahua, Ragdoll 레퍼런스를 1위로 반환했습니다.
+
+새 통합 endpoint는 `POST /analyze`이며 detection → classification → retrieval을 한 요청에서 처리합니다. detector를 불러오지 못하거나 box를 찾지 못하면 전체 이미지를 분석하는 fallback을 유지합니다.
 
 <img src="docs/screenshots/web-03-vit-upload-analysis.png" alt="PetLens ViT upload analysis" width="900" />
 

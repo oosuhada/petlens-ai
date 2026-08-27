@@ -23,9 +23,8 @@ import PhotoTile from "../components/PhotoTile";
 import usePetLensLocale from "../hooks/usePetLensLocale";
 import useReducedMotionPreference from "../hooks/useReducedMotionPreference";
 import {
-  classifyPet,
+  analyzePet,
   getCuratedPhotos,
-  getImageMatches,
   getQueryPhotos,
 } from "../lib/api";
 
@@ -118,12 +117,9 @@ export default function Home({ data }) {
     drawer.onOpen();
 
     try {
-      const [classification, matches] = await Promise.all([
-        classifyPet(file),
-        getImageMatches(file, 16),
-      ]);
-      setAnalysis(classification);
-      setPhotos(matches);
+      const result = await analyzePet(file, 16);
+      setAnalysis(result);
+      setPhotos(result.matches);
       setMode("similar");
       setActiveQuery("");
       setQuery("");
@@ -272,7 +268,7 @@ export default function Home({ data }) {
               boxShadow={dark ? "0 18px 38px rgba(0,0,0,0.20)" : "0 18px 42px rgba(59,37,70,0.07)"}
             >
               <Text color="pink.500" fontSize="10px" fontWeight="800" letterSpacing="0.16em">
-                VIT · {tr("품종 분석", "BREED ANALYSIS")}
+                PETLENS 2.0 · {tr("감지 + 품종 분석", "DETECT + BREED ANALYSIS")}
               </Text>
               <Heading
                 as="h2"
@@ -292,8 +288,8 @@ export default function Home({ data }) {
                 wordBreak="keep-all"
               >
                 {tr(
-                  "고양이 또는 강아지가 잘 보이는 사진 한 장을 올려보세요. ViT가 상위 5개 품종 확률을, CLIP이 이미지 유사도 기반 레퍼런스 순위를 반환합니다.",
-                  "Upload one clear cat or dog photo. ViT returns the top five breed probabilities while CLIP re-ranks the gallery by image similarity."
+                  "한 장의 사진에서 고양이와 강아지를 먼저 찾아 개체별로 분석합니다. 여러 마리나 사람·사물이 함께 있는 사진도 감지된 반려동물 영역을 기준으로 ViT Top-5와 CLIP 유사도 검색을 실행합니다.",
+                  "PetLens first detects cats and dogs, then analyzes each pet independently. Multi-pet photos and busy scenes are processed from the detected pet regions with ViT top-5 classification and CLIP similarity search."
                 )}
               </Text>
               <Flex

@@ -213,8 +213,13 @@ export default function Home({ data }) {
                 )}
               </Heading>
               <Text color={dark ? "whiteAlpha.700" : "gray.600"} mt="4" fontSize="sm" lineHeight="1.75" maxW="640px">
-                {tr(
-                  "원하는 장면을 문장으로 설명하면 CLIP이 37개 레퍼런스를 의미적으로 다시 정렬합니다. 현재는 영어 자연어 검색에서 가장 안정적으로 동작합니다.",
+                {isKo ? (
+                  <>
+                    <Box as="span" display="block">원하는 장면을 문장으로 설명하면</Box>
+                    <Box as="span" display="block">CLIP이 37개 레퍼런스를 의미적으로 다시 정렬합니다.</Box>
+                    <Box as="span" display="block">현재는 영어 자연어 검색에서 가장 안정적으로 동작합니다.</Box>
+                  </>
+                ) : (
                   "Describe the scene you want and CLIP re-ranks all 37 references by semantic similarity. English queries are the most stable in this demo."
                 )}
               </Text>
@@ -277,8 +282,13 @@ export default function Home({ data }) {
                 {tr("반려동물 사진 분석", "Analyze a pet photo")}
               </Heading>
               <Text color={dark ? "whiteAlpha.700" : "gray.600"} mt="4" fontSize="sm" lineHeight="1.75" maxW="640px">
-                {tr(
-                  "고양이 또는 강아지가 잘 보이는 사진 한 장을 올려보세요. ViT가 상위 5개 품종 확률을, CLIP이 이미지 유사도 기반 레퍼런스 순위를 반환합니다.",
+                {isKo ? (
+                  <>
+                    <Box as="span" display="block">고양이 또는 강아지가 잘 보이는 사진 한 장을 올려보세요.</Box>
+                    <Box as="span" display="block">ViT가 상위 5개 품종 확률을,</Box>
+                    <Box as="span" display="block">CLIP이 이미지 유사도 기반 레퍼런스 순위를 반환합니다.</Box>
+                  </>
+                ) : (
                   "Upload one clear cat or dog photo. ViT returns the top five breed probabilities while CLIP re-ranks the gallery by image similarity."
                 )}
               </Text>

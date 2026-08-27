@@ -122,7 +122,6 @@ export default function PhotoDetail({ pic }) {
           <Flex
             mt={[9, 10]}
             direction="row"
-            columnGap={[5, 6, 7]}
             align="stretch"
           >
             <Link href="/" passHref>
@@ -136,6 +135,7 @@ export default function PhotoDetail({ pic }) {
               target="_blank"
               rel="noopener noreferrer"
               flex="1"
+              ml={[4, 5, 6]}
               minH="52px"
               borderRadius="12px"
               variant="outline"

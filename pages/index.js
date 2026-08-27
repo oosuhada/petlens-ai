@@ -179,10 +179,10 @@ export default function Home({ data }) {
           <Flex
             direction="column"
             align="stretch"
-            gap={[7, 9, 12]}
           >
             <Box
               flex="1"
+              mb={[7, 9, 12]}
               bg={dark ? "#17131d" : "white"}
               border="1px solid"
               borderColor={dark ? "whiteAlpha.200" : "blackAlpha.100"}

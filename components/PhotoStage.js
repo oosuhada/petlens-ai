@@ -52,8 +52,8 @@ function FeaturedCard({ photo, position, pointer, depth, reducedMotion, dark }) 
         />
         <Text
           position="absolute"
-          left={["4", "4.5", "5"]}
-          bottom={["3.5", "4", "4.5"]}
+          left={["6", "5", "5"]}
+          bottom={["5", "4.5", "4.5"]}
           color="white"
           fontWeight="800"
           fontSize="xs"

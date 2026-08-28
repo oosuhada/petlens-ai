@@ -1,4 +1,4 @@
-# PetLens 2
+# PetLens
 
 **사진과 영상에서 반려동물을 감지하고, 개체별 품종·유사 이미지·포즈·행동을 분석하는 멀티모달 Pet Vision 서비스**
 
@@ -28,7 +28,9 @@ PetLens는 한 장의 사진을 단일 품종 classifier에 넣는 데서 끝나
 | Video tracking | SAM2 Video로 영상 속 개체를 frame 간 추적 |
 | Action timeline | CLIP 장면 의미 + tracking motion을 결합해 시간대별 행동 후보 생성 |
 
-<img src="docs/screenshots/v2/web-01-home.png" alt="PetLens 2 home, semantic search, photo and video upload, and 37-reference gallery" width="900" />
+<br />
+
+<img src="docs/screenshots/v2/web-01-home.png" alt="PetLens home, semantic search, photo and video upload, and 37-reference gallery" width="900" />
 
 ---
 
@@ -85,9 +87,9 @@ Dog-130 checkpoint가 설정되지 않았거나 로딩에 실패하면 API는 Pe
 - CLIP similarity ranking
 - optional SigLIP2 / DINOv2 / pose analysis
 
-<img src="docs/screenshots/v2/web-03-multipet-analysis.png" alt="PetLens 2 multi-pet photo analysis with cat and dog detection" width="900" />
+<img src="docs/screenshots/v2/web-03-multipet-analysis.png" alt="PetLens multi-pet photo analysis with cat and dog detection" width="900" />
 
-<img src="docs/screenshots/v2/web-04-analysis-details.png" alt="PetLens 2 Dog-130 prediction confidence and SAM2 segmentation details" width="900" />
+<img src="docs/screenshots/v2/web-04-analysis-details.png" alt="PetLens Dog-130 prediction confidence and SAM2 segmentation details" width="900" />
 
 ---
 
@@ -129,7 +131,7 @@ SAM2 Video tracking
 
 현재 Mac mini production은 CPU serving이므로 실시간 스트리밍 분석이 아니라 **짧은 영상 업로드 후 결과를 기다리는 batch UX**를 사용합니다.
 
-<img src="docs/screenshots/v2/web-07-video-analysis.png" alt="PetLens 2 SAM2 video tracking and per-track Dog-130 analysis" width="900" />
+<img src="docs/screenshots/v2/web-07-video-analysis.png" alt="PetLens SAM2 video tracking and per-track Dog-130 analysis" width="900" />
 
 ---
 
@@ -174,7 +176,7 @@ Motion · High motion
 
 따라서 action score는 calibrated probability가 아닙니다. 장면 의미와 motion prior를 결합한 **zero-shot 상대 점수**이며, 애매한 구간은 행동을 강제로 지정하지 않습니다.
 
-<img src="docs/screenshots/v2/web-08-action-timeline.png" alt="PetLens 2 semantic action timeline for two tracked dogs" width="900" />
+<img src="docs/screenshots/v2/web-08-action-timeline.png" alt="PetLens semantic action timeline for two tracked dogs" width="900" />
 
 ---
 
@@ -199,7 +201,7 @@ semantic ranking
 
 CLIP score는 품종 확률이 아니라 embedding similarity입니다.
 
-<img src="docs/screenshots/v2/web-02-semantic-search.png" alt="PetLens 2 CLIP semantic search for a small white fluffy dog" width="900" />
+<img src="docs/screenshots/v2/web-02-semantic-search.png" alt="PetLens CLIP semantic search for a small white fluffy dog" width="900" />
 
 ### Image → Image
 
@@ -215,7 +217,7 @@ Dog-130이 130개 품종을 분류하더라도 **reference gallery 자체는 37�
 
 `POST /open-set/siglip2`는 기존 classifier 결과와 SigLIP2 zero-shot 후보를 비교합니다. 두 모델의 불일치는 오답 확정이 아니라 ambiguity / open-set 탐색 신호로 사용합니다.
 
-<img src="docs/screenshots/v2/web-06-model-comparison.png" alt="PetLens 2 SigLIP2 zero-shot and CLIP DINOv2 retrieval comparison" width="900" />
+<img src="docs/screenshots/v2/web-06-model-comparison.png" alt="PetLens SigLIP2 zero-shot and CLIP DINOv2 retrieval comparison" width="900" />
 
 ---
 
@@ -237,7 +239,7 @@ Dog-130이 130개 품종을 분류하더라도 **reference gallery 자체는 37�
 
 웹 UI에서는 keypoint를 원본 이미지 위에 overlay해 표시합니다.
 
-<img src="docs/screenshots/v2/web-05-animal-pose.png" alt="PetLens 2 ViTPose++ AP-10K animal keypoint overlay" width="900" />
+<img src="docs/screenshots/v2/web-05-animal-pose.png" alt="PetLens ViTPose++ AP-10K animal keypoint overlay" width="900" />
 
 ---
 
@@ -279,8 +281,8 @@ Dog branch는 `google/vit-base-patch16-224`를 `giacomov/tsinghua_dogs` 데이�
 | GPU | **NVIDIA A100-SXM4-40GB** |
 
 <p align="center">
-  <img src="docs/screenshots/dog130-training/dog130-01-a100-runtime.png" alt="Dog-130 NVIDIA A100 runtime" width="440" />
-  <img src="docs/screenshots/dog130-training/dog130-02-training-progress.png" alt="Dog-130 training progress" width="440" />
+  <img src="docs/screenshots/dog130-training/dog130-01-a100-runtime.png" alt="Dog-130 NVIDIA A100 runtime" width="49%" />
+  <img src="docs/screenshots/dog130-training/dog130-02-training-progress.png" alt="Dog-130 training progress" width="49%" />
 </p>
 
 ### Validation metrics
@@ -293,8 +295,8 @@ Dog branch는 `google/vit-base-patch16-224`를 `giacomov/tsinghua_dogs` 데이�
 | Macro F1 | **0.8663649887** |
 
 <p align="center">
-  <img src="docs/screenshots/dog130-training/dog130-03-training-complete.png" alt="Dog-130 three-epoch training complete" width="440" />
-  <img src="docs/screenshots/dog130-training/dog130-04-final-metrics.png" alt="Dog-130 final metrics and production artifact verification" width="440" />
+  <img src="docs/screenshots/dog130-training/dog130-03-training-complete.png" alt="Dog-130 three-epoch training complete" width="49%" />
+  <img src="docs/screenshots/dog130-training/dog130-04-final-metrics.png" alt="Dog-130 final metrics and production artifact verification" width="49%" />
 </p>
 
 Training script:
@@ -347,7 +349,7 @@ FastAPI ML service의 주요 endpoint입니다.
 | `POST /compare/retrieval` | CLIP / DINOv2 image retrieval 비교 |
 | `POST /pose` | detection → ViTPose++ animal keypoints |
 
-`/analyze`가 PetLens 2의 기본 이미지 분석 endpoint입니다. Dog-130 hierarchical routing은 `/analyze`와 `/analyze/video`에서 적용됩니다.
+`/analyze`가 PetLens의 기본 이미지 분석 endpoint입니다. Dog-130 hierarchical routing은 `/analyze`와 `/analyze/video`에서 적용됩니다.
 
 ---
 
@@ -377,13 +379,13 @@ Live demo: **https://petlens.oosu.dev/**
 
 갤러리의 품종 카드를 열면 Oxford-IIIT Pet reference 이미지와 데이터셋·분류 클래스·모델 평가 지표를 확인할 수 있습니다.
 
-<img src="docs/screenshots/v2/web-09-breed-detail.png" alt="PetLens 2 Newfoundland breed reference detail" width="900" />
+<img src="docs/screenshots/v2/web-09-breed-detail.png" alt="PetLens Newfoundland breed reference detail" width="900" />
 
 ### Result guide
 
 가이드는 Dog-130 / Pet-37 routing, CLIP score, 영상 tracking과 semantic action timeline의 해석 기준을 설명합니다.
 
-<img src="docs/screenshots/v2/web-10-guide.png" alt="PetLens 2 result guide for Dog-130 and action timeline" width="900" />
+<img src="docs/screenshots/v2/web-10-guide.png" alt="PetLens result guide for Dog-130 and action timeline" width="900" />
 
 ---
 
@@ -480,7 +482,7 @@ petlens-ai/
 │   ├── api.js                    # frontend ↔ FastAPI client
 │   └── catalog.js
 ├── ml_service/
-│   ├── app.py                    # complete PetLens 2 inference pipeline
+│   ├── app.py                    # complete PetLens inference pipeline
 │   └── requirements.txt
 ├── pages/
 │   ├── index.js                  # gallery / search / photo / video analysis
@@ -534,3 +536,16 @@ PetLens의 결과를 해석할 때 다음 제한을 고려해야 합니다.
 - 현재 video analysis는 real-time stream processing이 아니라 sampled-frame batch inference입니다.
 
 PetLens는 의료 진단이나 행동 이상 진단을 위한 시스템이 아니라 **반려동물 visual understanding과 multimodal retrieval을 탐색하기 위한 AI application**입니다.
+
+---
+
+## Architecture & Topics / 아키텍처 및 주제
+
+**Architecture / 아키텍처**\
+[`multimodal-ai`](https://github.com/topics/multimodal-ai) · [`computer-vision`](https://github.com/topics/computer-vision) · [`object-detection`](https://github.com/topics/object-detection) · [`image-segmentation`](https://github.com/topics/image-segmentation) · [`image-classification`](https://github.com/topics/image-classification) · [`semantic-search`](https://github.com/topics/semantic-search) · [`image-retrieval`](https://github.com/topics/image-retrieval) · [`video-tracking`](https://github.com/topics/video-tracking) · [`zero-shot-learning`](https://github.com/topics/zero-shot-learning)
+
+**Project context / 프로젝트 맥락**\
+[`pet-classification`](https://github.com/topics/pet-classification) · [`dog-breed-classification`](https://github.com/topics/dog-breed-classification) · [`animal-pose-estimation`](https://github.com/topics/animal-pose-estimation) · [`action-recognition`](https://github.com/topics/action-recognition) · [`open-set-recognition`](https://github.com/topics/open-set-recognition) · [`video-analysis`](https://github.com/topics/video-analysis) · [`machine-learning`](https://github.com/topics/machine-learning) · [`deep-learning`](https://github.com/topics/deep-learning) · [`research-tool`](https://github.com/topics/research-tool)
+
+**Implementation stack / 구현 스택**\
+[`python`](https://github.com/topics/python) · [`javascript`](https://github.com/topics/javascript) · [`nextjs`](https://github.com/topics/nextjs) · [`react`](https://github.com/topics/react) · [`chakra-ui`](https://github.com/topics/chakra-ui) · [`fastapi`](https://github.com/topics/fastapi) · [`pytorch`](https://github.com/topics/pytorch) · [`transformers`](https://github.com/topics/transformers) · [`huggingface`](https://github.com/topics/huggingface) · [`clip`](https://github.com/topics/clip) · [`segment-anything`](https://github.com/topics/segment-anything) · [`vision-transformer`](https://github.com/topics/vision-transformer) · [`dinov2`](https://github.com/topics/dinov2) · [`vitpose`](https://github.com/topics/vitpose)

@@ -539,6 +539,20 @@ PetLens는 의료 진단이나 행동 이상 진단을 위한 시스템이 아�
 
 ---
 
+## Project note / 프로젝트 기록
+
+PetLens 프로젝트는 수도권 ICT 이노베이션스퀘어 **AI 멀티모달 과정**의 과제로 진행하였으며, **우수 수료생**으로 과정을 종료하였습니다.
+
+<p align="center">
+  <img
+    src="docs/screenshots/recognition/ict-innovation-square-outstanding-completion.jpg"
+    alt="수도권 ICT 이노베이션스퀘어 AI 멀티모달 과정 2기 우수 수료생 선정"
+    width="900"
+  />
+</p>
+
+---
+
 ## Architecture & Topics / 아키텍처 및 주제
 
 **Architecture / 아키텍처**\
